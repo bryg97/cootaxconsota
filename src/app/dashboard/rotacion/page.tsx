@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import RotacionClient from "./RotacionClient";
 
+// Página de rotación de turnos
 function toStringArray(value: any): string[] {
   return Array.isArray(value) ? value.filter((x) => typeof x === "string") : [];
 }
