@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+type Tramo = { inicio: string; fin: string };
+
 type Horario = {
   id: number;
   nombre: string;
   hora_inicio: string | null;
   hora_fin: string | null;
   horas_trabajadas: number;
+  tramos: Tramo[];
 };
 
 type Patron = {
@@ -29,8 +32,7 @@ type TurnoDia = {
   fecha: string; // YYYY-MM-DD
   horario_id: number | null;
   nombre: string;
-  hora_inicio: string | null;
-  hora_fin: string | null;
+  tramos: Tramo[];
   horas: number;
 };
 
@@ -65,11 +67,72 @@ function addDays(date: Date, n: number) {
   return d;
 }
 
+function minutos(hhmm: string) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function diffHoras(inicio: string, fin: string) {
+  const a = minutos(inicio);
+  const b = minutos(fin);
+  const mins = b >= a ? b - a : 24 * 60 - a + b;
+  return Math.round((mins / 60) * 100) / 100;
+}
+
+function horasTramos(tramos: Tramo[]) {
+  let total = 0;
+  for (const t of tramos) {
+    if (!t?.inicio || !t?.fin) continue;
+    total += diffHoras(t.inicio, t.fin);
+  }
+  return Math.round(total * 100) / 100;
+}
+
 function buildDetalleMap(detalle?: { dia: number; horario_id: number | null }[]) {
   const map: Record<number, number | null> = {};
   DIAS.forEach((x) => (map[x.dia] = null));
   (detalle ?? []).forEach((x) => (map[x.dia] = x.horario_id ?? null));
   return map;
+}
+
+/**
+ * Divide tramos que cruzan medianoche en 2:
+ *  - fecha: inicio -> 00:00
+ *  - fecha+1: 00:00 -> fin
+ */
+function splitTramosPorDia(fechaISO: string, tramos: Tramo[]) {
+  const out: { fecha: string; tramo: Tramo }[] = [];
+  const base = new Date(fechaISO + "T00:00:00");
+
+  for (const t of tramos ?? []) {
+    const a = t.inicio;
+    const b = t.fin;
+    if (!a || !b) continue;
+
+    // No cruza
+    if (b > a) {
+      out.push({ fecha: fechaISO, tramo: { inicio: a, fin: b } });
+      continue;
+    }
+
+    // Cruza medianoche
+    out.push({ fecha: fechaISO, tramo: { inicio: a, fin: "00:00" } });
+
+    const next = new Date(base);
+    next.setDate(next.getDate() + 1);
+    const nextISO = toISODate(next);
+
+    out.push({ fecha: nextISO, tramo: { inicio: "00:00", fin: b } });
+  }
+
+  return out;
+}
+
+function normalizeTramos(value: any): Tramo[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((x) => x && typeof x.inicio === "string" && typeof x.fin === "string")
+    .map((x) => ({ inicio: x.inicio, fin: x.fin }));
 }
 
 export default function RotacionClient({
@@ -85,13 +148,29 @@ export default function RotacionClient({
   sessionUserName: string;
   isAdmin: boolean;
   topeHorasSemanales: number;
-  initialHorarios: Horario[];
+  initialHorarios: any[];
   initialPatrones: Patron[];
   initialUsuarios: Usuario[];
 }) {
-  const [horarios] = useState<Horario[]>(initialHorarios);
+  const horarios: Horario[] = useMemo(() => {
+    return (initialHorarios ?? []).map((h: any) => ({
+      id: h.id,
+      nombre: h.nombre,
+      hora_inicio: h.hora_inicio ?? null,
+      hora_fin: h.hora_fin ?? null,
+      horas_trabajadas: Number(h.horas_trabajadas ?? 0),
+      tramos: normalizeTramos(h.tramos),
+    }));
+  }, [initialHorarios]);
+
   const [patrones] = useState<Patron[]>(initialPatrones);
   const [usuarios] = useState<Usuario[]>(initialUsuarios);
+
+  const horariosById = useMemo(() => {
+    const m = new Map<number, Horario>();
+    horarios.forEach((h) => m.set(h.id, h));
+    return m;
+  }, [horarios]);
 
   const [weekPick, setWeekPick] = useState<string>(() => toISODate(new Date()));
   const weekStart = useMemo(() => mondayOf(weekPick), [weekPick]);
@@ -106,11 +185,7 @@ export default function RotacionClient({
     [patrones, selectedPatronId]
   );
 
-  const horariosById = useMemo(() => {
-    const m = new Map<number, Horario>();
-    horarios.forEach((h) => m.set(h.id, h));
-    return m;
-  }, [horarios]);
+  const uidActual = isAdmin ? selectedUserId : sessionUserId;
 
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
@@ -120,26 +195,6 @@ export default function RotacionClient({
   // Modal edición día
   const [editFecha, setEditFecha] = useState<string | null>(null);
   const [editHorarioId, setEditHorarioId] = useState<number | "">("");
-
-  const previewFromPatron = useMemo(() => {
-    if (!selectedPatron) return null;
-    const detalleMap = buildDetalleMap(selectedPatron.patrones_turnos_detalle);
-
-    return DIAS.map((d, idx) => {
-      const fecha = toISODate(addDays(weekStart, idx));
-      const horario_id = detalleMap[d.dia] ?? null;
-      const h = horario_id ? horariosById.get(horario_id) : null;
-
-      return {
-        fecha,
-        horario_id,
-        nombre: h?.nombre ?? "Sin turno",
-        hora_inicio: h?.hora_inicio ?? null,
-        hora_fin: h?.hora_fin ?? null,
-        horas: Number(h?.horas_trabajadas ?? 0),
-      } as TurnoDia;
-    });
-  }, [selectedPatron, weekStart, horariosById]);
 
   const totalHoras = useMemo(
     () => turnosSemana.reduce((acc, x) => acc + (Number(x.horas) || 0), 0),
@@ -151,16 +206,14 @@ export default function RotacionClient({
     return Math.max(0, totalHoras - topeHorasSemanales);
   }, [totalHoras, topeHorasSemanales]);
 
-  const uidActual = isAdmin ? selectedUserId : sessionUserId;
-
-  // Cargar semana desde DB
+  // Cargar semana desde DB (1 fila por día con tramos)
   const loadSemana = async () => {
     setMsg("");
     if (!uidActual) return;
 
     const { data, error } = await supabase
       .from("turnos")
-      .select("fecha, horario_id, hora_inicio, hora_fin, horas_trabajadas")
+      .select("fecha, horario_id, tramos, horas_trabajadas")
       .eq("usuario_id", uidActual)
       .gte("fecha", weekStartISO)
       .lte("fecha", weekEndISO)
@@ -181,13 +234,15 @@ export default function RotacionClient({
       const hid = (t?.horario_id ?? null) as number | null;
       const h = hid ? horariosById.get(hid) : null;
 
+      const tr = normalizeTramos(t?.tramos);
+      const horas = Number(t?.horas_trabajadas ?? horasTramos(tr));
+
       return {
         fecha,
         horario_id: hid,
-        nombre: h?.nombre ?? (t ? "Asignado" : "Sin turno"),
-        hora_inicio: t?.hora_inicio ?? null,
-        hora_fin: t?.hora_fin ?? null,
-        horas: Number(t?.horas_trabajadas ?? 0),
+        nombre: h?.nombre ?? (horas > 0 ? "Asignado" : "Sin turno"),
+        tramos: tr,
+        horas,
       };
     });
 
@@ -199,14 +254,70 @@ export default function RotacionClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekStartISO, weekEndISO, selectedUserId]);
 
-  // Si admin selecciona patrón: preview
+  // Preview del patrón (sin guardar todavía) con splits de medianoche + merge a día siguiente
   useEffect(() => {
     if (!isAdmin) return;
-    if (previewFromPatron) setTurnosSemana(previewFromPatron);
+    if (!selectedPatron) return;
+
+    const detalleMap = buildDetalleMap(selectedPatron.patrones_turnos_detalle);
+
+    // Map fecha -> { horario_id base, tramos[] }
+    const m = new Map<string, { horario_id: number | null; tramos: Tramo[] }>();
+
+    // Inicializa semana con vacío
+    DIAS.forEach((_, idx) => {
+      const fecha = toISODate(addDays(weekStart, idx));
+      m.set(fecha, { horario_id: null, tramos: [] });
+    });
+
+    // Aplica por día del patrón
+    DIAS.forEach((d, idx) => {
+      const fecha = toISODate(addDays(weekStart, idx));
+      const horario_id = detalleMap[d.dia] ?? null;
+      const h = horario_id ? horariosById.get(horario_id) : null;
+
+      const baseTramos = h?.tramos?.length
+        ? h.tramos
+        : h?.hora_inicio && h?.hora_fin
+        ? [{ inicio: h.hora_inicio, fin: h.hora_fin }]
+        : [];
+
+      const splitted = splitTramosPorDia(fecha, baseTramos);
+
+      for (const s of splitted) {
+        if (!m.has(s.fecha)) {
+          // si cae en semana siguiente (domingo 23->lunes 00) lo ignoramos aquí
+          continue;
+        }
+        const obj = m.get(s.fecha)!;
+        obj.tramos.push(s.tramo);
+        // horario_id: sólo conservamos el del día original si no cruza,
+        // si se mezclan, lo dejamos null y el nombre será "Asignado"
+        obj.horario_id = horario_id;
+      }
+    });
+
+    const rows: TurnoDia[] = DIAS.map((_, idx) => {
+      const fecha = toISODate(addDays(weekStart, idx));
+      const obj = m.get(fecha)!;
+
+      const horas = horasTramos(obj.tramos);
+      const h = obj.horario_id ? horariosById.get(obj.horario_id) : null;
+
+      return {
+        fecha,
+        horario_id: obj.horario_id,
+        nombre: h?.nombre ?? (horas > 0 ? "Asignado" : "Sin turno"),
+        tramos: obj.tramos,
+        horas,
+      };
+    });
+
+    setTurnosSemana(rows);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPatronId, weekStartISO]);
 
-  // Guardar rotación (genera los 7 días)
+  // Guardar rotación (genera 1 fila por día con tramos)
   const guardarAsignacion = async () => {
     setMsg("");
 
@@ -244,7 +355,7 @@ export default function RotacionClient({
       return;
     }
 
-    // 2) borrar semana previa (para regenerar)
+    // 2) borrar semana previa
     const { error: delErr } = await supabase
       .from("turnos")
       .delete()
@@ -258,21 +369,58 @@ export default function RotacionClient({
       return;
     }
 
-    // 3) insertar los 7 días
+    // 3) generar mapa fecha->tramos con split y merge
     const detalleMap = buildDetalleMap(selectedPatron?.patrones_turnos_detalle);
 
-    const rowsToInsert = DIAS.map((d, idx) => {
+    const weekMap = new Map<string, { horario_id: number | null; tramos: Tramo[] }>();
+    DIAS.forEach((_, idx) => {
+      const fecha = toISODate(addDays(weekStart, idx));
+      weekMap.set(fecha, { horario_id: null, tramos: [] });
+    });
+
+    DIAS.forEach((d, idx) => {
       const fecha = toISODate(addDays(weekStart, idx));
       const horario_id = detalleMap[d.dia] ?? null;
       const h = horario_id ? horariosById.get(horario_id) : null;
 
+      const baseTramos = h?.tramos?.length
+        ? h.tramos
+        : h?.hora_inicio && h?.hora_fin
+        ? [{ inicio: h.hora_inicio, fin: h.hora_fin }]
+        : [];
+
+      const splitted = splitTramosPorDia(fecha, baseTramos);
+
+      for (const s of splitted) {
+        if (!weekMap.has(s.fecha)) continue; // cae fuera de esta semana
+        const obj = weekMap.get(s.fecha)!;
+        obj.tramos.push(s.tramo);
+
+        // si se mezclan tramos por arrastre, dejar horario_id null para evitar nombre incorrecto
+        if (s.fecha === fecha) obj.horario_id = horario_id;
+        else obj.horario_id = null;
+      }
+    });
+
+    // 4) insertar 7 filas (una por día)
+    const rowsToInsert = DIAS.map((_, idx) => {
+      const fecha = toISODate(addDays(weekStart, idx));
+      const obj = weekMap.get(fecha)!;
+
+      const tr = obj.tramos;
+      const horas = horasTramos(tr);
+
+      // compat: primer tramo como hora_inicio/hora_fin
+      const first = tr[0] ?? null;
+
       return {
         usuario_id: selectedUserId,
         fecha,
-        horario_id,
-        hora_inicio: h?.hora_inicio ?? null,
-        hora_fin: h?.hora_fin ?? null,
-        horas_trabajadas: Number(h?.horas_trabajadas ?? 0),
+        horario_id: obj.horario_id,
+        tramos: tr,
+        horas_trabajadas: horas,
+        hora_inicio: first ? first.inicio : null,
+        hora_fin: first ? first.fin : null,
       };
     });
 
@@ -287,23 +435,21 @@ export default function RotacionClient({
 
     setMsg(
       `✅ Rotación guardada (${weekStartISO} → ${weekEndISO}).` +
-        (topeHorasSemanales > 0 && totalHoras > topeHorasSemanales
-          ? ` ⚠️ Extras: ${extras}h.`
-          : "")
+        (topeHorasSemanales > 0 && totalHoras > topeHorasSemanales ? ` ⚠️ Extras: ${extras}h.` : "")
     );
 
     await loadSemana();
   };
 
-  // Abrir edición por día
+  // Abrir edición por día (admin)
   const abrirEditarDia = (t: TurnoDia) => {
-    if (!isAdmin) return; // solo admin edita
+    if (!isAdmin) return;
     setEditFecha(t.fecha);
     setEditHorarioId(t.horario_id ?? "");
     setMsg("");
   };
 
-  // Guardar edición de un día
+  // Guardar edición día (reemplaza tramos del día, y si cruza medianoche aplica arrastre al siguiente día)
   const guardarDia = async () => {
     if (!isAdmin) return;
     if (!editFecha) return;
@@ -311,30 +457,93 @@ export default function RotacionClient({
     const horario_id = editHorarioId === "" ? null : Number(editHorarioId);
     const h = horario_id ? horariosById.get(horario_id) : null;
 
+    const baseTramos = h?.tramos?.length
+      ? h.tramos
+      : h?.hora_inicio && h?.hora_fin
+      ? [{ inicio: h.hora_inicio, fin: h.hora_fin }]
+      : [];
+
+    // split por día (puede devolver 2 fechas)
+    const splitted = splitTramosPorDia(editFecha, baseTramos);
+
+    // Para este día: tramos asignados que caen en editFecha
+    const trHoy = splitted.filter((x) => x.fecha === editFecha).map((x) => x.tramo);
+    const horasHoy = horasTramos(trHoy);
+    const firstHoy = trHoy[0] ?? null;
+
     setSaving(true);
 
-    // upsert por (usuario_id, fecha) gracias al índice unique
-    const { error } = await supabase
+    // 1) upsert día actual
+    const { error: e1 } = await supabase
       .from("turnos")
       .upsert(
         {
           usuario_id: uidActual,
           fecha: editFecha,
           horario_id,
-          hora_inicio: h?.hora_inicio ?? null,
-          hora_fin: h?.hora_fin ?? null,
-          horas_trabajadas: Number(h?.horas_trabajadas ?? 0),
+          tramos: trHoy,
+          horas_trabajadas: horasHoy,
+          hora_inicio: firstHoy ? firstHoy.inicio : null,
+          hora_fin: firstHoy ? firstHoy.fin : null,
         },
         { onConflict: "usuario_id,fecha" }
       );
 
-    setSaving(false);
-
-    if (error) {
-      setMsg("❌ Error guardando día: " + error.message);
+    if (e1) {
+      setSaving(false);
+      setMsg("❌ Error guardando día: " + e1.message);
       return;
     }
 
+    // 2) Si hay arrastre al día siguiente, lo MERGE con lo que ya tenga ese día
+    const nextPart = splitted.find((x) => x.fecha !== editFecha);
+    if (nextPart) {
+      const nextFecha = nextPart.fecha;
+
+      // Solo si el día siguiente está dentro de la misma semana visible, hacemos merge
+      // (si está fuera, igual lo guardamos para consistencia)
+      const { data: nextRow, error: e2r } = await supabase
+        .from("turnos")
+        .select("tramos")
+        .eq("usuario_id", uidActual)
+        .eq("fecha", nextFecha)
+        .maybeSingle();
+
+      if (e2r) {
+        setSaving(false);
+        setMsg("❌ Error leyendo día siguiente: " + e2r.message);
+        return;
+      }
+
+      const existing = normalizeTramos((nextRow as any)?.tramos);
+      const merged = [...existing, nextPart.tramo];
+
+      const horasNext = horasTramos(merged);
+      const firstNext = merged[0] ?? null;
+
+      const { error: e2 } = await supabase
+        .from("turnos")
+        .upsert(
+          {
+            usuario_id: uidActual,
+            fecha: nextFecha,
+            horario_id: null, // ya está mezclado, evitamos "nombre" engañoso
+            tramos: merged,
+            horas_trabajadas: horasNext,
+            hora_inicio: firstNext ? firstNext.inicio : null,
+            hora_fin: firstNext ? firstNext.fin : null,
+          },
+          { onConflict: "usuario_id,fecha" }
+        );
+
+      if (e2) {
+        setSaving(false);
+        setMsg("❌ Error guardando arrastre al día siguiente: " + e2.message);
+        return;
+      }
+    }
+
+    setSaving(false);
     setMsg("✅ Día actualizado.");
     setEditFecha(null);
     setEditHorarioId("");
@@ -400,9 +609,7 @@ export default function RotacionClient({
           ) : (
             <div className="md:col-span-2">
               <label className="block text-xs font-medium mb-1">Operador</label>
-              <div className="border rounded-md px-3 py-2 text-sm bg-gray-50">
-                {sessionUserName}
-              </div>
+              <div className="border rounded-md px-3 py-2 text-sm bg-gray-50">{sessionUserName}</div>
               <p className="text-xs text-gray-500 mt-1">Solo visualización.</p>
             </div>
           )}
@@ -443,10 +650,10 @@ export default function RotacionClient({
               <button
                 key={t.fecha}
                 onClick={() => abrirEditarDia(t)}
+                disabled={!isAdmin}
                 className={`text-left rounded-lg border p-3 transition ${
                   hasShift ? "border-gray-200 hover:bg-gray-50" : "border-dashed border-gray-300 hover:bg-gray-50"
                 } ${isAdmin ? "cursor-pointer" : "cursor-default"}`}
-                disabled={!isAdmin}
                 title={isAdmin ? "Click para editar este día" : ""}
               >
                 <div className="text-xs text-gray-500">{label}</div>
@@ -457,7 +664,11 @@ export default function RotacionClient({
                     <>
                       <div className="font-medium text-gray-900">{t.nombre}</div>
                       <div className="text-xs text-gray-600">
-                        {t.hora_inicio ?? "—"} – {t.hora_fin ?? "—"}
+                        {t.tramos.map((x, i) => (
+                          <span key={i} className="inline-block mr-2 mb-1 px-2 py-1 rounded bg-gray-100">
+                            {x.inicio}–{x.fin}
+                          </span>
+                        ))}
                       </div>
                       <div className="text-xs mt-1">
                         Horas: <b>{t.horas}</b>
@@ -466,7 +677,9 @@ export default function RotacionClient({
                   ) : (
                     <>
                       <div className="text-sm text-gray-500">Sin turno</div>
-                      <div className="text-xs mt-1">Horas: <b>0</b></div>
+                      <div className="text-xs mt-1">
+                        Horas: <b>0</b>
+                      </div>
                     </>
                   )}
                 </div>
@@ -497,7 +710,12 @@ export default function RotacionClient({
               <option value="">— Sin turno —</option>
               {horarios.map((h) => (
                 <option key={h.id} value={h.id}>
-                  {h.nombre} {h.hora_inicio && h.hora_fin ? `(${h.hora_inicio}–${h.hora_fin})` : ""} - {h.horas_trabajadas}h
+                  {h.nombre}{" "}
+                  {h.tramos?.length
+                    ? `(${h.tramos.map((t) => `${t.inicio}-${t.fin}`).join(" | ")})`
+                    : ""}
+                  {" - "}
+                  {h.horas_trabajadas}h
                 </option>
               ))}
             </select>
@@ -521,6 +739,11 @@ export default function RotacionClient({
                 Cancelar
               </button>
             </div>
+
+            <p className="text-xs text-gray-500 mt-3">
+              Nota: si el turno cruza medianoche (23:00–06:00), se dividirá y se
+              agregará automáticamente el tramo 00:00–06:00 al día siguiente.
+            </p>
           </div>
         </div>
       )}
