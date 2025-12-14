@@ -97,7 +97,7 @@ export default async function RotacionPage() {
       sessionUserId={perfil.id}
       sessionUserName={perfil.nombre ?? "Usuario"}
       isAdmin={isAdmin}
-      topeHorasSemanales={Number((config as any)?.horas_semanales ?? 0)}
+      topeHorasSemanales={Number((config as any)?.horas_semanales ?? 44)}
       initialHorarios={horarios ?? []}
       initialPatrones={patrones ?? []}
       initialUsuarios={usuarios}

@@ -114,14 +114,34 @@ function dayLabel(i: number) {
   return ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"][i];
 }
 
-export default function RotacionClient() {
-  const [loading, setLoading] = useState(true);
+type RotacionClientProps = {
+  sessionUserId: string;
+  sessionUserName: string;
+  isAdmin: boolean;
+  topeHorasSemanales: number;
+  initialHorarios: any[];
+  initialPatrones: any[];
+  initialUsuarios: any[];
+};
+
+export default function RotacionClient({
+  sessionUserId,
+  sessionUserName,
+  isAdmin,
+  topeHorasSemanales,
+  initialHorarios,
+  initialPatrones,
+  initialUsuarios,
+}: RotacionClientProps) {
+  const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string>("");
 
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [horarios, setHorarios] = useState<Horario[]>([]);
-  const [patrones, setPatrones] = useState<Patron[]>([]);
-  const [config, setConfig] = useState<Config>({ horas_semanales: 44 });
+  const [usuarios, setUsuarios] = useState<Usuario[]>(initialUsuarios);
+  const [horarios, setHorarios] = useState<Horario[]>(
+    initialHorarios.map((h: any) => ({ ...h, tramos: sanitizeTramos(h.tramos) }))
+  );
+  const [patrones, setPatrones] = useState<Patron[]>(initialPatrones);
+  const [config, setConfig] = useState<Config>({ horas_semanales: topeHorasSemanales });
 
   // UI state
   const [fechaPick, setFechaPick] = useState<string>(isoDate(new Date()));
@@ -136,30 +156,12 @@ export default function RotacionClient() {
     return Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
   }, [weekStart]);
 
+  // Establecer usuario inicial
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setMsg("");
-
-      const [{ data: u }, { data: h }, { data: p }, { data: c }] = await Promise.all([
-        supabase.from("usuarios").select("id, nombre, rol").order("nombre", { ascending: true }),
-        supabase
-          .from("horarios")
-          .select("id, nombre, tramos, horas_trabajadas")
-          .order("nombre", { ascending: true }),
-        supabase.from("patrones_semanales").select("*").order("nombre", { ascending: true }),
-        supabase.from("configuraciones").select("horas_semanales").order("id", { ascending: true }).limit(1).maybeSingle(),
-      ]);
-
-      setUsuarios((u as any) ?? []);
-      setHorarios(((h as any) ?? []).map((x: any) => ({ ...x, tramos: sanitizeTramos(x.tramos) })));
-      setPatrones((p as any) ?? []);
-      setConfig({ horas_semanales: (c as any)?.horas_semanales ?? 44 });
-
-      if ((u as any)?.[0]?.id) setUsuarioId((u as any)[0].id);
-      setLoading(false);
-    })();
-  }, []);
+    if (!usuarioId && usuarios.length > 0) {
+      setUsuarioId(isAdmin ? usuarios[0]?.id ?? "" : sessionUserId);
+    }
+  }, [usuarios, isAdmin, sessionUserId, usuarioId]);
 
   // Cargar rotación existente de esa semana/usuario
   useEffect(() => {
@@ -343,8 +345,6 @@ export default function RotacionClient() {
       setMsg("❌ " + (e?.message ?? "Error guardando rotación"));
     }
   };
-
-  if (loading) return <div className="p-6">Cargando…</div>;
 
   return (
     <div className="space-y-6">
