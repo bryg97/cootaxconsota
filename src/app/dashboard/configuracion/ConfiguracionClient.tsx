@@ -4,6 +4,80 @@
 import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+type Formulas = {
+  // divisores
+  valor_hora_divisor_mensual: number; // normalmente 240
+  valor_dia_divisor: number; // normalmente 30
+
+  // recargos
+  recargo_nocturno_ordinario: number; // 0.35
+  recargo_diurno_festivo: number; // 1.80
+  recargo_nocturno_festivo: number; // 2.15
+  recargo_diurno_domingo: number; // 0.80
+  recargo_nocturno_domingo: number; // 1.15
+
+  // extras
+  extra_diurna_ordinaria: number; // 1.25
+  extra_nocturna_ordinaria: number; // 1.75
+  extra_diurna_festivo_domingo: number; // 2.00
+  extra_nocturna_festivo_domingo: number; // 2.50
+};
+
+const DEFAULT_FORMULAS: Formulas = {
+  valor_hora_divisor_mensual: 240,
+  valor_dia_divisor: 30,
+
+  recargo_nocturno_ordinario: 0.35,
+  recargo_diurno_festivo: 1.8,
+  recargo_nocturno_festivo: 2.15,
+  recargo_diurno_domingo: 0.8,
+  recargo_nocturno_domingo: 1.15,
+
+  extra_diurna_ordinaria: 1.25,
+  extra_nocturna_ordinaria: 1.75,
+  extra_diurna_festivo_domingo: 2.0,
+  extra_nocturna_festivo_domingo: 2.5,
+};
+
+function toNum(v: any, fallback: number) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeFormulas(raw: any): Formulas {
+  const f = raw ?? {};
+  return {
+    valor_hora_divisor_mensual: toNum(
+      f.valor_hora_divisor_mensual,
+      DEFAULT_FORMULAS.valor_hora_divisor_mensual
+    ),
+    valor_dia_divisor: toNum(f.valor_dia_divisor, DEFAULT_FORMULAS.valor_dia_divisor),
+
+    recargo_nocturno_ordinario: toNum(
+      f.recargo_nocturno_ordinario,
+      DEFAULT_FORMULAS.recargo_nocturno_ordinario
+    ),
+    recargo_diurno_festivo: toNum(f.recargo_diurno_festivo, DEFAULT_FORMULAS.recargo_diurno_festivo),
+    recargo_nocturno_festivo: toNum(
+      f.recargo_nocturno_festivo,
+      DEFAULT_FORMULAS.recargo_nocturno_festivo
+    ),
+    recargo_diurno_domingo: toNum(f.recargo_diurno_domingo, DEFAULT_FORMULAS.recargo_diurno_domingo),
+    recargo_nocturno_domingo: toNum(f.recargo_nocturno_domingo, DEFAULT_FORMULAS.recargo_nocturno_domingo),
+
+    extra_diurna_ordinaria: toNum(f.extra_diurna_ordinaria, DEFAULT_FORMULAS.extra_diurna_ordinaria),
+    extra_nocturna_ordinaria: toNum(f.extra_nocturna_ordinaria, DEFAULT_FORMULAS.extra_nocturna_ordinaria),
+    extra_diurna_festivo_domingo: toNum(
+      f.extra_diurna_festivo_domingo,
+      DEFAULT_FORMULAS.extra_diurna_festivo_domingo
+    ),
+    extra_nocturna_festivo_domingo: toNum(
+      f.extra_nocturna_festivo_domingo,
+      DEFAULT_FORMULAS.extra_nocturna_festivo_domingo
+    ),
+  };
+}
+
 type Configuracion = {
   id: number;
   horas_mensuales?: number | null;
@@ -21,6 +95,9 @@ type Configuracion = {
   recargo_diurno_dominical_fin?: string | null;
   recargo_nocturno_dominical_inicio?: string | null;
   recargo_nocturno_dominical_fin?: string | null;
+
+  // NUEVO (jsonb)
+  formulas?: any;
 };
 
 type Festivo = {
@@ -45,27 +122,45 @@ export default function ConfiguracionClient({
   const [nuevoFestivoFecha, setNuevoFestivoFecha] = useState("");
   const [nuevoFestivoDesc, setNuevoFestivoDesc] = useState("");
 
-  const formulas = useMemo(
-    () => [
-      "Valor de la hora = salario base / tope horas mensuales",
-      "Valor día = salario base / 30",
-      "Recargo nocturno ordinario (lun-sáb, no festivo) = valor hora * 0.35",
-      "Recargo diurno festivo = valor hora * 1.80",
-      "Recargo nocturno festivo = valor hora * 2.15",
-      "Recargo diurno domingo = valor hora * 0.80",
-      "Recargo nocturno domingo = valor hora * 1.15",
-      "Hora extra diurna (lun-sáb no festivo) = valor hora * 1.25",
-      "Hora extra nocturna (lun-sáb no festivo) = valor hora * 1.75",
-      "Hora extra diurna (domingos o festivos) = valor hora * 2.0",
-      "Hora extra nocturna (domingos o festivos) = valor hora * 2.5",
-    ],
-    []
+  // Fórmulas editables (jsonb)
+  const [formulas, setFormulas] = useState<Formulas>(() =>
+    normalizeFormulas(initialConfig?.formulas)
   );
+
+  // Simulación con salario
+  const [salarioEjemplo, setSalarioEjemplo] = useState<number | "">("");
+
+  const valorHora = useMemo(() => {
+    if (salarioEjemplo === "" || !Number(salarioEjemplo)) return 0;
+    const divisor = formulas.valor_hora_divisor_mensual || (config?.horas_mensuales ?? 0) || 240;
+    if (!divisor) return 0;
+    return Number(salarioEjemplo) / Number(divisor);
+  }, [salarioEjemplo, formulas.valor_hora_divisor_mensual, config?.horas_mensuales]);
+
+  const valorDia = useMemo(() => {
+    if (salarioEjemplo === "" || !Number(salarioEjemplo)) return 0;
+    const divisor = formulas.valor_dia_divisor || 30;
+    return Number(salarioEjemplo) / Number(divisor);
+  }, [salarioEjemplo, formulas.valor_dia_divisor]);
+
+  const recargosPreview = useMemo(() => {
+    const vh = valorHora;
+    return {
+      recargo_nocturno_ordinario: vh * formulas.recargo_nocturno_ordinario,
+      recargo_diurno_festivo: vh * formulas.recargo_diurno_festivo,
+      recargo_nocturno_festivo: vh * formulas.recargo_nocturno_festivo,
+      recargo_diurno_domingo: vh * formulas.recargo_diurno_domingo,
+      recargo_nocturno_domingo: vh * formulas.recargo_nocturno_domingo,
+      extra_diurna_ordinaria: vh * formulas.extra_diurna_ordinaria,
+      extra_nocturna_ordinaria: vh * formulas.extra_nocturna_ordinaria,
+      extra_diurna_festivo_domingo: vh * formulas.extra_diurna_festivo_domingo,
+      extra_nocturna_festivo_domingo: vh * formulas.extra_nocturna_festivo_domingo,
+    };
+  }, [valorHora, formulas]);
 
   const ensureConfig = async () => {
     if (config) return config;
 
-    // Intentar crear una fila si no existe (usa defaults)
     const { data, error } = await supabase
       .from("configuraciones")
       .insert({})
@@ -74,8 +169,7 @@ export default function ConfiguracionClient({
 
     if (error) {
       throw new Error(
-        "No existe configuración y no se pudo crear automáticamente. " +
-          error.message
+        "No existe configuración y no se pudo crear automáticamente. " + error.message
       );
     }
 
@@ -89,6 +183,20 @@ export default function ConfiguracionClient({
       setSaving(true);
 
       const cfg = await ensureConfig();
+
+      // Validaciones mínimas
+      if ((cfg.horas_mensuales ?? 0) !== 0 && cfg.horas_mensuales !== null && (cfg.horas_mensuales ?? 0) < 0) {
+        throw new Error("Las horas mensuales no pueden ser negativas.");
+      }
+      if ((cfg.horas_semanales ?? 0) !== 0 && cfg.horas_semanales !== null && (cfg.horas_semanales ?? 0) < 0) {
+        throw new Error("Las horas semanales no pueden ser negativas.");
+      }
+      if (!formulas.valor_hora_divisor_mensual || formulas.valor_hora_divisor_mensual <= 0) {
+        throw new Error("El divisor mensual (valor hora) debe ser > 0.");
+      }
+      if (!formulas.valor_dia_divisor || formulas.valor_dia_divisor <= 0) {
+        throw new Error("El divisor día debe ser > 0.");
+      }
 
       const { error } = await supabase
         .from("configuraciones")
@@ -108,12 +216,15 @@ export default function ConfiguracionClient({
           recargo_diurno_dominical_fin: cfg.recargo_diurno_dominical_fin ?? null,
           recargo_nocturno_dominical_inicio: cfg.recargo_nocturno_dominical_inicio ?? null,
           recargo_nocturno_dominical_fin: cfg.recargo_nocturno_dominical_fin ?? null,
+
+          // ✅ Guardar formulas (jsonb)
+          formulas,
         })
         .eq("id", cfg.id);
 
       if (error) throw new Error(error.message);
 
-      setMsg("✅ Configuración guardada correctamente.");
+      setMsg("✅ Configuración guardada correctamente (incluye fórmulas).");
     } catch (e: any) {
       setMsg("❌ " + (e?.message ?? "Error guardando configuración"));
     } finally {
@@ -143,7 +254,9 @@ export default function ConfiguracionClient({
       return;
     }
 
-    setFestivos((prev) => [...prev, data as Festivo].sort((a, b) => a.fecha.localeCompare(b.fecha)));
+    setFestivos((prev) =>
+      [...prev, data as Festivo].sort((a, b) => a.fecha.localeCompare(b.fecha))
+    );
     setNuevoFestivoFecha("");
     setNuevoFestivoDesc("");
     setMsg("✅ Festivo agregado.");
@@ -170,6 +283,54 @@ export default function ConfiguracionClient({
     });
   };
 
+  const setFormula = (key: keyof Formulas, value: string) => {
+    setFormulas((prev) => ({
+      ...prev,
+      [key]: toNum(value, prev[key]),
+    }));
+  };
+
+  const formulasTexto = useMemo(
+    () => [
+      `Valor de la hora = salario base / divisor mensual (${formulas.valor_hora_divisor_mensual})`,
+      `Valor día = salario base / divisor día (${formulas.valor_dia_divisor})`,
+      `Recargo nocturno ordinario (lun-sáb, no festivo) = valor hora * ${formulas.recargo_nocturno_ordinario}`,
+      `Recargo diurno festivo = valor hora * ${formulas.recargo_diurno_festivo}`,
+      `Recargo nocturno festivo = valor hora * ${formulas.recargo_nocturno_festivo}`,
+      `Recargo diurno domingo = valor hora * ${formulas.recargo_diurno_domingo}`,
+      `Recargo nocturno domingo = valor hora * ${formulas.recargo_nocturno_domingo}`,
+      `Hora extra diurna (lun-sáb no festivo) = valor hora * ${formulas.extra_diurna_ordinaria}`,
+      `Hora extra nocturna (lun-sáb no festivo) = valor hora * ${formulas.extra_nocturna_ordinaria}`,
+      `Hora extra diurna (domingos o festivos) = valor hora * ${formulas.extra_diurna_festivo_domingo}`,
+      `Hora extra nocturna (domingos o festivos) = valor hora * ${formulas.extra_nocturna_festivo_domingo}`,
+    ],
+    [formulas]
+  );
+
+  const FormulaField = ({
+    label,
+    k,
+    hint,
+    step = "0.01",
+  }: {
+    label: string;
+    k: keyof Formulas;
+    hint?: string;
+    step?: string;
+  }) => (
+    <div className="border rounded-lg p-3">
+      <p className="text-xs font-semibold mb-1">{label}</p>
+      {hint && <p className="text-[11px] text-gray-500 mb-2">{hint}</p>}
+      <input
+        type="number"
+        step={step}
+        className="w-full border rounded-md px-3 py-2 text-sm"
+        value={String(formulas[k])}
+        onChange={(e) => setFormula(k, e.target.value)}
+      />
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -183,11 +344,7 @@ export default function ConfiguracionClient({
         </button>
       </div>
 
-      {msg && (
-        <div className="bg-white rounded-lg shadow p-3 text-sm">
-          {msg}
-        </div>
-      )}
+      {msg && <div className="bg-white rounded-lg shadow p-3 text-sm">{msg}</div>}
 
       {/* Configuración general */}
       <section className="bg-white rounded-lg shadow p-4">
@@ -195,26 +352,28 @@ export default function ConfiguracionClient({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium mb-1">
-              Tope horas semanales
-            </label>
+            <label className="block text-xs font-medium mb-1">Tope horas semanales</label>
             <input
               type="number"
               className="w-full border rounded-md px-3 py-2 text-sm"
               value={config?.horas_semanales ?? ""}
-              onChange={(e) => setField("horas_semanales", e.target.value === "" ? null : Number(e.target.value))}
+              onChange={(e) =>
+                setField("horas_semanales", e.target.value === "" ? null : Number(e.target.value))
+              }
+              min={0}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium mb-1">
-              Tope horas mensuales
-            </label>
+            <label className="block text-xs font-medium mb-1">Tope horas mensuales</label>
             <input
               type="number"
               className="w-full border rounded-md px-3 py-2 text-sm"
               value={config?.horas_mensuales ?? ""}
-              onChange={(e) => setField("horas_mensuales", e.target.value === "" ? null : Number(e.target.value))}
+              onChange={(e) =>
+                setField("horas_mensuales", e.target.value === "" ? null : Number(e.target.value))
+              }
+              min={0}
             />
           </div>
         </div>
@@ -245,7 +404,7 @@ export default function ConfiguracionClient({
             </div>
           </div>
 
-          {/* Festivo diurno/nocturno */}
+          {/* Festivo */}
           <div className="border rounded-lg p-3">
             <p className="text-xs font-semibold mb-2">Festivo</p>
             <div className="grid grid-cols-2 gap-2">
@@ -289,7 +448,7 @@ export default function ConfiguracionClient({
             </div>
           </div>
 
-          {/* Dominical diurno/nocturno */}
+          {/* Dominical */}
           <div className="border rounded-lg p-3">
             <p className="text-xs font-semibold mb-2">Dominical</p>
             <div className="grid grid-cols-2 gap-2">
@@ -330,6 +489,85 @@ export default function ConfiguracionClient({
                   onChange={(e) => setField("recargo_nocturno_dominical_fin", e.target.value)}
                 />
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ✅ NUEVO: Editor de fórmulas */}
+      <section className="bg-white rounded-lg shadow p-4">
+        <h2 className="text-sm font-semibold mb-3">Fórmulas (editables)</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <FormulaField
+            label="Divisor mensual (valor hora)"
+            k="valor_hora_divisor_mensual"
+            step="1"
+            hint="Salario base / este valor. Normalmente 240."
+          />
+          <FormulaField
+            label="Divisor día (valor día)"
+            k="valor_dia_divisor"
+            step="1"
+            hint="Salario base / este valor. Normalmente 30."
+          />
+
+          <FormulaField label="Recargo nocturno ordinario" k="recargo_nocturno_ordinario" hint="Ej: 0.35 = 35%" />
+          <FormulaField label="Recargo diurno festivo" k="recargo_diurno_festivo" hint="Ej: 1.80" />
+          <FormulaField label="Recargo nocturno festivo" k="recargo_nocturno_festivo" hint="Ej: 2.15" />
+          <FormulaField label="Recargo diurno domingo" k="recargo_diurno_domingo" hint="Ej: 0.80" />
+          <FormulaField label="Recargo nocturno domingo" k="recargo_nocturno_domingo" hint="Ej: 1.15" />
+          <FormulaField label="Hora extra diurna ordinaria" k="extra_diurna_ordinaria" hint="Ej: 1.25" />
+          <FormulaField label="Hora extra nocturna ordinaria" k="extra_nocturna_ordinaria" hint="Ej: 1.75" />
+          <FormulaField label="Hora extra diurna (dom/fest)" k="extra_diurna_festivo_domingo" hint="Ej: 2.00" />
+          <FormulaField label="Hora extra nocturna (dom/fest)" k="extra_nocturna_festivo_domingo" hint="Ej: 2.50" />
+        </div>
+
+        {/* Simulación */}
+        <div className="mt-4 border-t pt-4">
+          <h3 className="text-sm font-semibold mb-2">Simulación rápida</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1">Salario base (ejemplo)</label>
+              <input
+                type="number"
+                min={0}
+                className="w-full border rounded-md px-3 py-2 text-sm"
+                value={salarioEjemplo}
+                onChange={(e) => setSalarioEjemplo(e.target.value === "" ? "" : Number(e.target.value))}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1">Valor hora</label>
+              <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm">
+                {valorHora.toFixed(2)}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1">Valor día</label>
+              <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm">
+                {valorDia.toFixed(2)}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div className="bg-gray-50 p-3 rounded-md">
+              <p>Recargo nocturno ordinario: {recargosPreview.recargo_nocturno_ordinario.toFixed(2)}</p>
+              <p>Recargo diurno festivo: {recargosPreview.recargo_diurno_festivo.toFixed(2)}</p>
+              <p>Recargo nocturno festivo: {recargosPreview.recargo_nocturno_festivo.toFixed(2)}</p>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded-md">
+              <p>Recargo diurno domingo: {recargosPreview.recargo_diurno_domingo.toFixed(2)}</p>
+              <p>Recargo nocturno domingo: {recargosPreview.recargo_nocturno_domingo.toFixed(2)}</p>
+              <p>Extra diurna ordinaria: {recargosPreview.extra_diurna_ordinaria.toFixed(2)}</p>
+              <p>Extra nocturna ordinaria: {recargosPreview.extra_nocturna_ordinaria.toFixed(2)}</p>
+              <p>Extra diurna dom/fest: {recargosPreview.extra_diurna_festivo_domingo.toFixed(2)}</p>
+              <p>Extra nocturna dom/fest: {recargosPreview.extra_nocturna_festivo_domingo.toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -407,11 +645,11 @@ export default function ConfiguracionClient({
         </div>
       </section>
 
-      {/* Fórmulas */}
+      {/* Fórmulas (texto) */}
       <section className="bg-white rounded-lg shadow p-4">
         <h2 className="text-sm font-semibold mb-3">Fórmulas (referencia)</h2>
         <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
-          {formulas.map((f) => (
+          {formulasTexto.map((f) => (
             <li key={f}>{f}</li>
           ))}
         </ul>
