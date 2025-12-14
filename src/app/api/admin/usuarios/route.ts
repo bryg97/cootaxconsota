@@ -10,7 +10,7 @@ const supabaseAdmin = createClient(
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { nombre, email, password, rol, salario_base } = body;
+    const { nombre, email, password, rol, salario_base, tipo_descanso } = body;
 
     if (!email || !password || !nombre) {
       return NextResponse.json(
@@ -45,6 +45,7 @@ export async function POST(req: Request) {
         email,
         rol, // recuerda: también tienes rol_id si luego lo quieres usar
         salario_base: salario_base ?? 0,
+        tipo_descanso: tipo_descanso ?? "fijo_domingo",
       });
 
     if (perfilError) {

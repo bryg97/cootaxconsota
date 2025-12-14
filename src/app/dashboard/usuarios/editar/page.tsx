@@ -12,6 +12,7 @@ type Usuario = {
   email: string;
   rol: string | null;
   salario_base: number | null;
+  tipo_descanso: string | null;
 };
 
 export default function EditarUsuarioPage() {
@@ -59,7 +60,7 @@ export default function EditarUsuarioPage() {
       // 3) Cargar usuario a editar
       const { data, error } = await supabase
         .from("usuarios")
-        .select("id, nombre, email, rol, salario_base")
+        .select("id, nombre, email, rol, salario_base, tipo_descanso")
         .eq("id", id)
         .single();
 

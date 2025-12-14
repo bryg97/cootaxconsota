@@ -33,7 +33,7 @@ export default async function NuevaNominaPage() {
   // Cargar configuración
   const { data: config } = await supabase
     .from("configuraciones")
-    .select("horas_mensuales, auxilio_transporte, fondo_solidario")
+    .select("horas_mensuales, horas_semanales, auxilio_transporte, fondo_solidario")
     .order("id", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -41,7 +41,7 @@ export default async function NuevaNominaPage() {
   // Cargar usuarios activos con salario
   const { data: usuariosData } = await supabase
     .from("usuarios")
-    .select("id, nombre, email, salario_base, roles(nombre)")
+    .select("id, nombre, email, salario_base, tipo_descanso, roles(nombre)")
     .eq("estado", "activo")
     .order("nombre", { ascending: true });
 
@@ -51,6 +51,7 @@ export default async function NuevaNominaPage() {
     nombre: u.nombre,
     email: u.email,
     salario_base: u.salario_base,
+    tipo_descanso: u.tipo_descanso || "fijo_domingo",
     roles: { nombre: u.roles?.nombre || "operador" },
   }));
 
@@ -66,12 +67,19 @@ export default async function NuevaNominaPage() {
     .select("fecha")
     .order("fecha", { ascending: true });
 
+  // Cargar patrones semanales para descanso obligatorio aleatorio
+  const { data: patrones } = await supabase
+    .from("patrones_semanales")
+    .select("*")
+    .order("id", { ascending: true });
+
   return (
     <NuevaNominaClient
       config={config || {}}
       usuarios={usuarios}
       horarios={horarios || []}
       festivos={festivos || []}
+      patrones={patrones || []}
     />
   );
 }

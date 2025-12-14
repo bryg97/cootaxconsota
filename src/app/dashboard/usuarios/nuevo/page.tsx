@@ -10,6 +10,7 @@ export default function NuevoUsuarioPage() {
   const [email, setEmail] = useState("");
   const [rol, setRol] = useState("operador");
   const [salarioBase, setSalarioBase] = useState<number | "">("");
+  const [tipoDescanso, setTipoDescanso] = useState("fijo_domingo");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -32,6 +33,7 @@ export default function NuevoUsuarioPage() {
           rol,
           salario_base:
             salarioBase === "" ? null : Number(salarioBase),
+          tipo_descanso: tipoDescanso,
         }),
       });
 
@@ -134,6 +136,23 @@ export default function NuevoUsuarioPage() {
             }
             min={0}
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Tipo de descanso obligatorio
+          </label>
+          <select
+            className="w-full border rounded-md px-3 py-2 text-sm"
+            value={tipoDescanso}
+            onChange={(e) => setTipoDescanso(e.target.value)}
+          >
+            <option value="fijo_domingo">Fijo (Domingo)</option>
+            <option value="aleatorio">Aleatorio (Según patrón)</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Fijo: Siempre descansa domingo. Aleatorio: Según patrón semanal
+          </p>
         </div>
 
         <div className="flex gap-2">

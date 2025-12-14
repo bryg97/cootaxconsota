@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 type Config = {
   horas_mensuales?: number;
+  horas_semanales?: number;
   auxilio_transporte?: number;
   fondo_solidario?: number;
 };
@@ -15,6 +16,7 @@ type Usuario = {
   nombre: string;
   email: string;
   salario_base: number;
+  tipo_descanso: string;
   roles: { nombre: string };
 };
 
@@ -29,11 +31,23 @@ type Festivo = {
   fecha: string;
 };
 
+type PatronSemanal = {
+  id: number;
+  lunes: number | null;
+  martes: number | null;
+  miercoles: number | null;
+  jueves: number | null;
+  viernes: number | null;
+  sabado: number | null;
+  domingo: number | null;
+};
+
 type Props = {
   config: Config;
   usuarios: Usuario[];
   horarios: Horario[];
   festivos: Festivo[];
+  patrones: PatronSemanal[];
 };
 
 function isoDate(d: Date) {
@@ -56,6 +70,7 @@ export default function NuevaNominaClient({
   usuarios,
   horarios,
   festivos,
+  patrones,
 }: Props) {
   const router = useRouter();
   
@@ -160,58 +175,132 @@ export default function NuevaNominaClient({
       const auxilioPeriodo = tipo === "quincenal" ? auxilioTransporte / 2 : auxilioTransporte;
       const fondoPeriodo = tipo === "quincenal" ? fondoSolidario / 2 : fondoSolidario;
       const valorHora = salarioBase / horasMensuales;
+      const valorDia = salarioBase / 30;
 
       const turnosUsuario = turnosPorUsuario[u.id] || [];
       
+      // Agrupar turnos por semana
+      const turnosPorSemana: Record<string, any[]> = {};
+      turnosUsuario.forEach((turno) => {
+        const fecha = new Date(turno.fecha + "T00:00:00");
+        const lunes = new Date(fecha);
+        lunes.setDate(fecha.getDate() - fecha.getDay() + (fecha.getDay() === 0 ? -6 : 1));
+        const semanaKey = lunes.toISOString().slice(0, 10);
+        if (!turnosPorSemana[semanaKey]) turnosPorSemana[semanaKey] = [];
+        turnosPorSemana[semanaKey].push(turno);
+      });
+
       let horasTrabajadas = 0;
+      let horasExtras = 0;
       let horasRecargoNocturno = 0;
       let horasRecargoFestivo = 0;
       let horasRecargoDominical = 0;
+      let diasAdicionalesDescanso = 0;
 
-      // Calcular horas por cada turno
-      turnosUsuario.forEach((turno) => {
-        const horario = horarioById.get(turno.horario_id);
-        if (!horario) return;
+      const horasSemanales = config.horas_semanales || 48;
 
-        const fecha = turno.fecha;
-        const esFestivo = festivosSet.has(fecha);
-        const esDomingo = new Date(fecha + "T00:00:00").getDay() === 0;
+      // Procesar cada semana individualmente
+      Object.entries(turnosPorSemana).forEach(([semanaKey, turnosSemana]) => {
+        // Determinar día de descanso obligatorio
+        let diaDescansoObligatorio = 0; // 0 = domingo
         
-        const horasTurno = horario.horas_trabajadas || 0;
-        horasTrabajadas += horasTurno;
+        if (u.tipo_descanso === "aleatorio") {
+          // Buscar en patrones semanales el día de descanso
+          // Por simplicidad, tomamos el primer patrón (puedes mejorar esto)
+          const patron = patrones[0];
+          if (patron) {
+            const diasPatron = [
+              patron.domingo,
+              patron.lunes,
+              patron.martes,
+              patron.miercoles,
+              patron.jueves,
+              patron.viernes,
+              patron.sabado,
+            ];
+            // Buscar el primer día sin turno asignado (null) como descanso
+            const indiceDescanso = diasPatron.findIndex((h) => h === null);
+            if (indiceDescanso !== -1) {
+              diaDescansoObligatorio = indiceDescanso;
+            }
+          }
+        } else {
+          // fijo_domingo
+          diaDescansoObligatorio = 0;
+        }
 
-        // Calcular horas nocturnas del horario
-        const horasNocturnasTurno = calcularHorasNocturnas(horario.tramos || []);
+        // Verificar si tuvo descanso en la semana
+        const fechasSemana = turnosSemana.map((t) => t.fecha);
+        const diasConTurno = new Set(
+          fechasSemana.map((f) => new Date(f + "T00:00:00").getDay())
+        );
+        
+        const tuvoDescansoObligatorio = !diasConTurno.has(diaDescansoObligatorio);
+        
+        // Calcular horas de la semana
+        let horasSemana = 0;
+        let horasExtrasSemana = 0;
+        
+        turnosSemana.forEach((turno) => {
+          const horario = horarioById.get(turno.horario_id);
+          if (!horario) return;
 
-        // Los recargos tienen prioridad: festivo > dominical > nocturno
-        if (esFestivo) {
-          horasRecargoFestivo += horasTurno;
-        } else if (esDomingo) {
-          horasRecargoDominical += horasTurno;
-        } else if (horasNocturnasTurno > 0) {
-          horasRecargoNocturno += horasNocturnasTurno;
+          const fecha = turno.fecha;
+          const esFestivo = festivosSet.has(fecha);
+          const diaNumero = new Date(fecha + "T00:00:00").getDay();
+          const esDiaDescanso = diaNumero === diaDescansoObligatorio;
+          
+          const horasTurno = horario.horas_trabajadas || 0;
+          const horasNocturnasTurno = calcularHorasNocturnas(horario.tramos || []);
+
+          // Si trabajó en día de descanso obligatorio, se trata como festivo
+          if (esDiaDescanso) {
+            horasRecargoFestivo += horasTurno;
+            horasSemana += horasTurno;
+          } else if (esFestivo) {
+            horasRecargoFestivo += horasTurno;
+            horasSemana += horasTurno;
+          } else if (diaNumero === 0) { // Domingo pero no es día de descanso obligatorio
+            horasRecargoDominical += horasTurno;
+            horasSemana += horasTurno;
+          } else if (horasNocturnasTurno > 0) {
+            horasRecargoNocturno += horasNocturnasTurno;
+            horasSemana += horasTurno;
+          } else {
+            horasSemana += horasTurno;
+          }
+        });
+
+        // Calcular extras de la semana
+        if (horasSemana > horasSemanales) {
+          horasExtrasSemana = horasSemana - horasSemanales;
+          horasExtras += horasExtrasSemana;
+        }
+
+        horasTrabajadas += horasSemana;
+
+        // Si no tuvo descanso obligatorio, pagar un día adicional
+        if (!tuvoDescansoObligatorio && turnosSemana.length >= 6) {
+          diasAdicionalesDescanso += 1;
         }
       });
 
-      // Calcular horas extras (si supera tope del periodo)
-      const horasTopePeriodo = tipo === "quincenal" ? horasMensuales / 2 : horasMensuales;
-      const horasExtras = Math.max(0, horasTrabajadas - horasTopePeriodo);
-      const horasNormales = horasTrabajadas - horasExtras;
-
+      // Calcular valores monetarios
       const valorHorasExtras = horasExtras * valorHora * 1.25;
       const valorRecargoNocturno = horasRecargoNocturno * valorHora * 0.35;
       const valorRecargoFestivo = horasRecargoFestivo * valorHora * 0.75;
       const valorRecargoDominical = horasRecargoDominical * valorHora * 0.75;
+      const valorDiasAdicionales = diasAdicionalesDescanso * valorDia;
 
       const totalRecargos =
         valorRecargoNocturno + valorRecargoFestivo + valorRecargoDominical;
 
       const totalDevengado =
-        salarioPeriodo + auxilioPeriodo + valorHorasExtras + totalRecargos;
+        salarioPeriodo + auxilioPeriodo + valorHorasExtras + totalRecargos + valorDiasAdicionales;
 
       // Deducciones: 4% salud + 4% pensión
-      // Base: salario + extras + recargos (NO incluye auxilio)
-      const baseDeduccion = salarioPeriodo + valorHorasExtras + totalRecargos;
+      // Base: salario + extras + recargos + días adicionales (NO incluye auxilio)
+      const baseDeduccion = salarioPeriodo + valorHorasExtras + totalRecargos + valorDiasAdicionales;
       const deduccionSalud = baseDeduccion * 0.04;
       const deduccionPension = baseDeduccion * 0.04;
       const deduccionFondo = fondoPeriodo;
@@ -235,6 +324,8 @@ export default function NuevaNominaClient({
         valor_recargo_festivo: valorRecargoFestivo,
         horas_recargo_dominical: horasRecargoDominical,
         valor_recargo_dominical: valorRecargoDominical,
+        dias_adicionales_descanso: diasAdicionalesDescanso,
+        valor_dias_adicionales: valorDiasAdicionales,
         total_recargos: totalRecargos,
         total_devengado: totalDevengado,
         deduccion_salud: deduccionSalud,
@@ -244,7 +335,7 @@ export default function NuevaNominaClient({
         neto_pagar: netoPagar,
       };
     });
-  }, [usuarios, tipo, auxilioTransporte, fondoSolidario, horasMensuales, fechaInicio, fechaFin, festivosSet]);
+  }, [usuarios, tipo, auxilioTransporte, fondoSolidario, horasMensuales, config.horas_semanales, fechaInicio, fechaFin, festivosSet, turnosPorUsuario, horarioById, patrones]);
 
   const totales = useMemo(() => {
     return nominaCalculada.reduce(
@@ -426,6 +517,7 @@ export default function NuevaNominaClient({
                 <th className="px-2 py-2 text-right">Auxilio</th>
                 <th className="px-2 py-2 text-right">H. Extras</th>
                 <th className="px-2 py-2 text-right">Recargos</th>
+                <th className="px-2 py-2 text-right">Días Adic.</th>
                 <th className="px-2 py-2 text-right">Total Dev.</th>
                 <th className="px-2 py-2 text-right">Deducciones</th>
                 <th className="px-2 py-2 text-right">Neto</th>
@@ -439,6 +531,15 @@ export default function NuevaNominaClient({
                   <td className="px-2 py-2 text-right">{formatCurrency(n.auxilio_transporte)}</td>
                   <td className="px-2 py-2 text-right">{formatCurrency(n.valor_horas_extras)}</td>
                   <td className="px-2 py-2 text-right">{formatCurrency(n.total_recargos)}</td>
+                  <td className="px-2 py-2 text-right">
+                    {n.dias_adicionales_descanso > 0 ? (
+                      <span className="text-orange-600" title={`${n.dias_adicionales_descanso} días adicionales por descanso no tomado`}>
+                        {formatCurrency(n.valor_dias_adicionales)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
                   <td className="px-2 py-2 text-right font-medium text-green-600">
                     {formatCurrency(n.total_devengado)}
                   </td>

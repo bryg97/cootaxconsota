@@ -11,6 +11,7 @@ type Usuario = {
   email: string;
   rol: string | null;
   salario_base: number | null;
+  tipo_descanso: string | null;
 };
 
 interface Props {
@@ -29,6 +30,9 @@ export default function EditUsuarioForm({
   const [rol, setRol] = useState(initialUsuario.rol ?? "operador");
   const [salarioBase, setSalarioBase] = useState<number | "">(
     initialUsuario.salario_base ?? ""
+  );
+  const [tipoDescanso, setTipoDescanso] = useState(
+    initialUsuario.tipo_descanso ?? "fijo_domingo"
   );
 
   // Estados para cambiar contraseña (solo si canChangePassword)
@@ -105,6 +109,7 @@ export default function EditUsuarioForm({
         rol,
         salario_base:
           salarioBase === "" ? null : Number(salarioBase),
+        tipo_descanso: tipoDescanso,
       })
       .eq("id", initialUsuario.id);
 
@@ -206,6 +211,24 @@ export default function EditUsuarioForm({
             }
             min={0}
           />
+        </div>
+
+        {/* Tipo de descanso obligatorio */}
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Tipo de descanso obligatorio
+          </label>
+          <select
+            className="w-full border rounded-md px-3 py-2 text-sm"
+            value={tipoDescanso}
+            onChange={(e) => setTipoDescanso(e.target.value)}
+          >
+            <option value="fijo_domingo">Fijo (Domingo)</option>
+            <option value="aleatorio">Aleatorio (Según patrón)</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Fijo: Siempre descansa domingo. Aleatorio: Según patrón semanal
+          </p>
         </div>
 
         {/* Cambiar contraseña — SOLO si el admin edita su propia cuenta */}
