@@ -139,6 +139,8 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
       hora_fin: sinHoras ? null : first?.fin ?? null,
     };
 
+    console.log("Guardando turno:", { nombre: nombre.trim(), tramosCount: cleanTramos.length, tramos: cleanTramos, horas });
+
     const q = editingId
       ? supabase.from("horarios").update(payload).eq("id", editingId)
       : supabase.from("horarios").insert(payload);
@@ -239,13 +241,25 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
     setSaving(true);
 
     let actualizados = 0;
+    let detalles: string[] = [];
+    
     for (const t of turnos) {
       const tTramos = sanitizeTramos(t.tramos);
-      const horasReales = tTramos.length > 0 
-        ? Math.round(sumHorasTramos(tTramos) * 100) / 100 
-        : 0;
+      
+      // Si no hay tramos válidos, verificamos si hay hora_inicio/hora_fin (legacy)
+      let horasReales = 0;
+      if (tTramos.length > 0) {
+        horasReales = Math.round(sumHorasTramos(tTramos) * 100) / 100;
+        detalles.push(`${t.nombre}: ${tTramos.length} tramos = ${horasReales}h`);
+      } else if (t.hora_inicio && t.hora_fin) {
+        // Calcular desde hora_inicio/hora_fin si no hay tramos
+        horasReales = Math.round(diffHoras(t.hora_inicio, t.hora_fin) * 100) / 100;
+        detalles.push(`${t.nombre}: legacy (${t.hora_inicio}-${t.hora_fin}) = ${horasReales}h`);
+      } else {
+        detalles.push(`${t.nombre}: sin datos = 0h`);
+      }
 
-      // Solo actualizamos si las horas son diferentes
+      // Actualizamos si las horas son diferentes
       if (horasReales !== (t.horas_trabajadas ?? 0)) {
         const { error } = await supabase
           .from("horarios")
@@ -254,14 +268,14 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
 
         if (!error) {
           actualizados++;
-          // Actualizamos el estado local
           setTurnos((prev) => prev.map((x) => x.id === t.id ? { ...x, horas_trabajadas: horasReales } : x));
         }
       }
     }
 
     setSaving(false);
-    setMsg(`✅ Se recalcularon y actualizaron ${actualizados} turnos.`);
+    console.log("Detalles de recálculo:", detalles);
+    setMsg(`✅ Se recalcularon y actualizaron ${actualizados} turnos. Ver consola para detalles.`);
   };
 
   return (
@@ -269,6 +283,12 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Turnos</h1>
         <div className="flex gap-2">
+          <a
+            href="/dashboard/turnos/patrones"
+            className="border border-green-600 text-green-600 hover:bg-green-50 text-sm font-semibold px-4 py-2 rounded-md"
+          >
+            Patrones semanales
+          </a>
           <button
             onClick={recalcularHoras}
             disabled={saving}

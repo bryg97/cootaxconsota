@@ -29,7 +29,7 @@ export default async function TurnosPage() {
 
   const { data: turnos, error } = await supabase
     .from("horarios")
-    .select("id, nombre, hora_inicio, hora_fin, horas_trabajadas, created_at")
+    .select("id, nombre, hora_inicio, hora_fin, tramos, horas_trabajadas, created_at")
     .order("id", { ascending: true });
 
   if (error) {
