@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
 type Tramo = { inicio: string; fin: string };
@@ -9,59 +8,69 @@ type Tramo = { inicio: string; fin: string };
 type Turno = {
   id: number;
   nombre: string;
+  // Legacy (pueden existir, pero NO son la fuente de verdad si usas tramos)
   hora_inicio: string | null;
   hora_fin: string | null;
+
+  // Nuevo
+  tramos?: Tramo[] | null;
+
   horas_trabajadas: number;
-  tramos: Tramo[];
   created_at?: string | null;
 };
 
-function minutos(hhmm: string) {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
+function toHHMM(v: string) {
+  // a veces llega "HH:MM:SS"
+  return v?.slice(0, 5) ?? "";
 }
 
 function diffHoras(inicio: string, fin: string) {
-  const a = minutos(inicio);
-  const b = minutos(fin);
-  const mins = b >= a ? b - a : 24 * 60 - a + b; // cruza medianoche
-  return Math.round((mins / 60) * 100) / 100;
+  const [hi, mi] = toHHMM(inicio).split(":").map(Number);
+  const [hf, mf] = toHHMM(fin).split(":").map(Number);
+  const a = hi * 60 + mi;
+  const b = hf * 60 + mf;
+  const minutos = b >= a ? b - a : 24 * 60 - a + b; // cruza medianoche
+  return Math.round((minutos / 60) * 100) / 100;
 }
 
-function horasTramos(tramos: Tramo[]) {
-  let total = 0;
-  for (const t of tramos) {
-    if (!t.inicio || !t.fin) continue;
-    total += diffHoras(t.inicio, t.fin);
-  }
-  return Math.round(total * 100) / 100;
+function sanitizeTramos(input: any): Tramo[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter(Boolean)
+    .map((t) => ({
+      inicio: toHHMM(String(t?.inicio ?? "")),
+      fin: toHHMM(String(t?.fin ?? "")),
+    }))
+    .filter((t) => t.inicio && t.fin);
 }
 
-export default function TurnosClient({ initialTurnos }: { initialTurnos: any[] }) {
-  const normalized: Turno[] = (initialTurnos ?? []).map((t: any) => ({
-    id: t.id,
-    nombre: t.nombre,
-    hora_inicio: t.hora_inicio,
-    hora_fin: t.hora_fin,
-    horas_trabajadas: Number(t.horas_trabajadas ?? 0),
-    tramos: Array.isArray(t.tramos) ? t.tramos : [],
-    created_at: t.created_at ?? null,
-  }));
+function sumHorasTramos(tramos: Tramo[]) {
+  return tramos.reduce((acc, t) => acc + diffHoras(t.inicio, t.fin), 0);
+}
 
-  const [turnos, setTurnos] = useState<Turno[]>(normalized);
+function tramosToText(tramos: Tramo[]) {
+  if (!tramos.length) return "—";
+  return tramos.map((t) => `${toHHMM(t.inicio)}–${toHHMM(t.fin)}`).join(" / ");
+}
+
+export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[] }) {
+  const [turnos, setTurnos] = useState<Turno[]>(
+    (initialTurnos ?? []).map((t) => ({ ...t, tramos: sanitizeTramos((t as any).tramos) }))
+  );
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  // Form
   const [nombre, setNombre] = useState("");
   const [sinHoras, setSinHoras] = useState(false);
   const [tramos, setTramos] = useState<Tramo[]>([{ inicio: "", fin: "" }]);
 
   const horasCalculadas = useMemo(() => {
     if (sinHoras) return 0;
-    const ok = tramos.filter((t) => t.inicio && t.fin);
-    if (ok.length === 0) return null;
-    return horasTramos(ok);
+    const clean = sanitizeTramos(tramos);
+    if (!clean.length) return null;
+    return Math.round(sumHorasTramos(clean) * 100) / 100;
   }, [tramos, sinHoras]);
 
   const resetForm = () => {
@@ -69,27 +78,36 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: any[] }
     setNombre("");
     setSinHoras(false);
     setTramos([{ inicio: "", fin: "" }]);
-    setMsg("");
   };
 
   const startEdit = (t: Turno) => {
     setEditingId(t.id);
     setNombre(t.nombre ?? "");
-    const isZero = (t.horas_trabajadas ?? 0) === 0 && (!t.tramos || t.tramos.length === 0);
-    setSinHoras(isZero);
-    setTramos(t.tramos?.length ? t.tramos : [{ inicio: t.hora_inicio ?? "", fin: t.hora_fin ?? "" }]);
+
+    const tTramos = sanitizeTramos(t.tramos);
+    const isSinHoras =
+      (t.horas_trabajadas ?? 0) === 0 &&
+      (!tTramos.length || tTramos.every((x) => diffHoras(x.inicio, x.fin) === 0));
+
+    setSinHoras(isSinHoras);
+
+    if (tTramos.length) {
+      setTramos(tTramos.map((x) => ({ inicio: toHHMM(x.inicio), fin: toHHMM(x.fin) })));
+    } else if (t.hora_inicio && t.hora_fin) {
+      setTramos([{ inicio: toHHMM(t.hora_inicio), fin: toHHMM(t.hora_fin) }]);
+    } else {
+      setTramos([{ inicio: "", fin: "" }]);
+    }
+
     setMsg("");
   };
 
-  const addTramo = () => setTramos((prev) => [...prev, { inicio: "", fin: "" }]);
-
-  const removeTramo = (idx: number) => {
-    setTramos((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const updateTramo = (idx: number, key: "inicio" | "fin", value: string) => {
+  const updateTramo = (idx: number, key: keyof Tramo, value: string) => {
     setTramos((prev) => prev.map((t, i) => (i === idx ? { ...t, [key]: value } : t)));
   };
+
+  const addTramo = () => setTramos((prev) => [...prev, { inicio: "", fin: "" }]);
+  const removeTramo = (idx: number) => setTramos((prev) => prev.filter((_, i) => i !== idx));
 
   const upsertTurno = async () => {
     setMsg("");
@@ -99,28 +117,26 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: any[] }
       return;
     }
 
-    const tramosValidos = sinHoras
-      ? []
-      : tramos.filter((t) => t.inicio && t.fin);
+    const cleanTramos = sinHoras ? [] : sanitizeTramos(tramos);
 
-    if (!sinHoras && tramosValidos.length === 0) {
-      setMsg("❌ Agrega al menos 1 tramo (inicio y fin) o marca 'Turno sin horas'.");
+    if (!sinHoras && cleanTramos.length === 0) {
+      setMsg("❌ Debes agregar al menos 1 tramo válido (inicio y fin).");
       return;
     }
 
-    const totalHoras = sinHoras ? 0 : horasTramos(tramosValidos);
-
-    // Compatibilidad: guardar primer tramo en hora_inicio/hora_fin
-    const first = tramosValidos[0] ?? null;
+    const horas = sinHoras ? 0 : Math.round(sumHorasTramos(cleanTramos) * 100) / 100;
 
     setSaving(true);
 
-    const payload = {
+    // Compatibilidad: guardamos hora_inicio/hora_fin con el primer tramo (si existe)
+    const first = cleanTramos[0];
+
+    const payload: any = {
       nombre: nombre.trim(),
-      tramos: tramosValidos,
-      horas_trabajadas: totalHoras,
-      hora_inicio: first ? first.inicio : null,
-      hora_fin: first ? first.fin : null,
+      tramos: cleanTramos, // ✅ fuente de verdad
+      horas_trabajadas: horas,
+      hora_inicio: sinHoras ? null : first?.inicio ?? null,
+      hora_fin: sinHoras ? null : first?.fin ?? null,
     };
 
     const q = editingId
@@ -128,7 +144,7 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: any[] }
       : supabase.from("horarios").insert(payload);
 
     const { data, error } = await q
-      .select("id, nombre, hora_inicio, hora_fin, horas_trabajadas, tramos, created_at")
+      .select("id, nombre, hora_inicio, hora_fin, tramos, horas_trabajadas, created_at")
       .single();
 
     setSaving(false);
@@ -138,11 +154,16 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: any[] }
       return;
     }
 
+    const saved: Turno = {
+      ...(data as any),
+      tramos: sanitizeTramos((data as any)?.tramos),
+    };
+
     if (editingId) {
-      setTurnos((prev) => prev.map((x) => (x.id === editingId ? (data as any) : x)));
+      setTurnos((prev) => prev.map((x) => (x.id === editingId ? saved : x)));
       setMsg("✅ Turno actualizado.");
     } else {
-      setTurnos((prev) => [...prev, data as any]);
+      setTurnos((prev) => [...prev, saved]);
       setMsg("✅ Turno creado.");
     }
 
@@ -151,46 +172,103 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: any[] }
 
   const deleteTurno = async (t: Turno) => {
     if (!confirm(`¿Eliminar turno "${t.nombre}"?`)) return;
+
     setMsg("");
     const { error } = await supabase.from("horarios").delete().eq("id", t.id);
+
     if (error) {
       setMsg("❌ Error eliminando turno: " + error.message);
       return;
     }
+
     setTurnos((prev) => prev.filter((x) => x.id !== t.id));
     setMsg("✅ Turno eliminado.");
   };
 
+  // Crear turnos base rápidos (si no existen)
+  const crearBase = async () => {
+    setMsg("");
+    setSaving(true);
+
+    const bases: Array<{ nombre: string; tramos: Tramo[] }> = [
+      { nombre: "06:00 a 14:00", tramos: [{ inicio: "06:00", fin: "14:00" }] },
+      { nombre: "14:00 a 22:00", tramos: [{ inicio: "14:00", fin: "22:00" }] },
+      { nombre: "22:00 a 06:00", tramos: [{ inicio: "22:00", fin: "06:00" }] },
+      { nombre: "Descanso obligatorio", tramos: [] },
+      { nombre: "Día libre", tramos: [] },
+      { nombre: "Vacaciones", tramos: [] },
+      { nombre: "Incapacidad", tramos: [] },
+    ];
+
+    for (const b of bases) {
+      if (turnos.some((t) => t.nombre === b.nombre)) continue;
+
+      const horas = b.tramos.length ? Math.round(sumHorasTramos(b.tramos) * 100) / 100 : 0;
+      const first = b.tramos[0];
+
+      const { data, error } = await supabase
+        .from("horarios")
+        .insert({
+          nombre: b.nombre,
+          tramos: b.tramos,
+          horas_trabajadas: horas,
+          hora_inicio: first?.inicio ?? null,
+          hora_fin: first?.fin ?? null,
+        })
+        .select("id, nombre, hora_inicio, hora_fin, tramos, horas_trabajadas, created_at")
+        .single();
+
+      if (!error && data) {
+        setTurnos((prev) => [
+          ...prev,
+          { ...(data as any), tramos: sanitizeTramos((data as any).tramos) } as Turno,
+        ]);
+      }
+    }
+
+    setSaving(false);
+    setMsg("✅ Turnos base listos (se omitieron los que ya existían).");
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Turnos</h1>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/dashboard/turnos/patrones"
-            className="border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold px-4 py-2 rounded-md"
-          >
-            Patrones semanales
-          </Link>
-        </div>
+        <button
+          onClick={crearBase}
+          disabled={saving}
+          className="border border-red-600 text-red-600 hover:bg-red-50 text-sm font-semibold px-4 py-2 rounded-md disabled:opacity-50"
+        >
+          Crear turnos base
+        </button>
       </div>
 
       {msg && <div className="bg-white rounded-lg shadow p-3 text-sm">{msg}</div>}
 
       {/* Form */}
       <section className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-sm font-semibold mb-3">{editingId ? "Editar turno" : "Crear turno"}</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">
+            {editingId ? "Editar turno" : "Crear turno"}
+          </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="text-xs text-gray-600">
+            {horasCalculadas !== null && (
+              <>
+                Horas calculadas: <b>{horasCalculadas}</b>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium mb-1">Nombre</label>
             <input
               className="w-full border rounded-md px-3 py-2 text-sm"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej: 07:00–12:00 y 13:00–16:00 / 23:00–06:00"
+              placeholder="Ej: Oficina 8h / Vacaciones / Día libre"
             />
           </div>
 
@@ -203,71 +281,70 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: any[] }
               />
               Turno sin horas (0)
             </label>
-
-            {horasCalculadas !== null && (
-              <span className="text-xs text-gray-600">
-                Horas calculadas: <b>{horasCalculadas}</b>
-              </span>
-            )}
           </div>
         </div>
 
         {/* Tramos */}
-        <div className="mt-4 space-y-3">
+        <div className="mt-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold">Tramos del turno</p>
             <button
+              type="button"
               onClick={addTramo}
               disabled={sinHoras}
-              className="border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-semibold px-3 py-1 rounded-md disabled:opacity-50"
+              className="text-xs border border-gray-300 rounded-md px-3 py-1 hover:bg-gray-50 disabled:opacity-50"
             >
               + Agregar tramo
             </button>
           </div>
 
-          {tramos.map((t, idx) => (
-            <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium mb-1">Inicio</label>
-                <input
-                  type="time"
-                  className="w-full border rounded-md px-3 py-2 text-sm"
-                  value={t.inicio}
-                  onChange={(e) => updateTramo(idx, "inicio", e.target.value)}
-                  disabled={sinHoras}
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium mb-1">Fin</label>
-                <input
-                  type="time"
-                  className="w-full border rounded-md px-3 py-2 text-sm"
-                  value={t.fin}
-                  onChange={(e) => updateTramo(idx, "fin", e.target.value)}
-                  disabled={sinHoras}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => removeTramo(idx)}
-                  disabled={sinHoras || tramos.length === 1}
-                  className="border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-semibold px-3 py-2 rounded-md disabled:opacity-50"
-                >
-                  Quitar
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <p className="text-xs text-gray-500">
-            ✅ Si un tramo cruza medianoche (ej 23:00–06:00) está permitido.
+          <p className="text-xs text-gray-500 mt-1">
+            ✅ Si un tramo cruza medianoche (ej: 23:00–06:00) está permitido.
           </p>
+
+          <div className="mt-3 space-y-2">
+            {tramos.map((t, idx) => (
+              <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                <div className="md:col-span-5">
+                  <label className="block text-xs font-medium mb-1">Inicio</label>
+                  <input
+                    type="time"
+                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    value={t.inicio}
+                    onChange={(e) => updateTramo(idx, "inicio", e.target.value)}
+                    disabled={sinHoras}
+                  />
+                </div>
+
+                <div className="md:col-span-5">
+                  <label className="block text-xs font-medium mb-1">Fin</label>
+                  <input
+                    type="time"
+                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    value={t.fin}
+                    onChange={(e) => updateTramo(idx, "fin", e.target.value)}
+                    disabled={sinHoras}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <button
+                    type="button"
+                    onClick={() => removeTramo(idx)}
+                    disabled={sinHoras || tramos.length === 1}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="mt-4 flex gap-2">
           <button
+            type="button"
             onClick={upsertTurno}
             disabled={saving}
             className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-md disabled:opacity-50"
@@ -277,6 +354,7 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: any[] }
 
           {editingId && (
             <button
+              type="button"
               onClick={resetForm}
               className="border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold px-4 py-2 rounded-md"
             >
@@ -301,35 +379,30 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: any[] }
               </tr>
             </thead>
             <tbody>
-              {turnos.map((t) => (
-                <tr key={t.id} className="border-b hover:bg-gray-50">
-                  <td className="px-3 py-2 font-medium">{t.nombre}</td>
-                  <td className="px-3 py-2 text-xs text-gray-700">
-                    {(t.tramos?.length ?? 0) > 0
-                      ? t.tramos.map((x, i) => (
-                          <span key={i} className="inline-block mr-2 mb-1 px-2 py-1 rounded bg-gray-100">
-                            {x.inicio}–{x.fin}
-                          </span>
-                        ))
-                      : "—"}
-                  </td>
-                  <td className="px-3 py-2">{t.horas_trabajadas ?? 0}</td>
-                  <td className="px-3 py-2 space-x-2">
-                    <button
-                      onClick={() => startEdit(t)}
-                      className="px-3 py-1 rounded-md border border-blue-400 text-blue-600 hover:bg-blue-50 text-xs"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => deleteTurno(t)}
-                      className="px-3 py-1 rounded-md border border-gray-400 text-gray-700 hover:bg-gray-100 text-xs"
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {turnos.map((t) => {
+                const tTramos = sanitizeTramos(t.tramos);
+                return (
+                  <tr key={t.id} className="border-b hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium">{t.nombre}</td>
+                    <td className="px-3 py-2">{tramosToText(tTramos)}</td>
+                    <td className="px-3 py-2">{t.horas_trabajadas ?? 0}</td>
+                    <td className="px-3 py-2 space-x-2">
+                      <button
+                        onClick={() => startEdit(t)}
+                        className="px-3 py-1 rounded-md border border-blue-400 text-blue-600 hover:bg-blue-50 text-xs"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => deleteTurno(t)}
+                        className="px-3 py-1 rounded-md border border-gray-400 text-gray-700 hover:bg-gray-100 text-xs"
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
 
               {turnos.length === 0 && (
                 <tr>
