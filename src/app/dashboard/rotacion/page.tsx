@@ -41,7 +41,7 @@ export default async function RotacionPage() {
   // Turnos catálogo (horarios)
   const { data: horarios, error: horariosError } = await supabase
     .from("horarios")
-    .select("id, nombre, hora_inicio, hora_fin, horas_trabajadas")
+    .select("id, nombre, hora_inicio, hora_fin, tramos, horas_trabajadas")
     .order("id", { ascending: true });
 
   if (horariosError) {
