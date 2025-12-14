@@ -39,11 +39,20 @@ export default async function NuevaNominaPage() {
     .maybeSingle();
 
   // Cargar usuarios activos con salario
-  const { data: usuarios } = await supabase
+  const { data: usuariosData } = await supabase
     .from("usuarios")
     .select("id, nombre, email, salario_base, roles(nombre)")
     .eq("estado", "activo")
     .order("nombre", { ascending: true });
+
+  // Mapear usuarios para tener el formato correcto
+  const usuarios = (usuariosData || []).map((u: any) => ({
+    id: u.id,
+    nombre: u.nombre,
+    email: u.email,
+    salario_base: u.salario_base,
+    roles: { nombre: u.roles?.nombre || "operador" },
+  }));
 
   // Cargar horarios con tramos
   const { data: horarios } = await supabase
@@ -60,7 +69,7 @@ export default async function NuevaNominaPage() {
   return (
     <NuevaNominaClient
       config={config || {}}
-      usuarios={usuarios || []}
+      usuarios={usuarios}
       horarios={horarios || []}
       festivos={festivos || []}
     />
