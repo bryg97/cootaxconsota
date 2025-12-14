@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
 type Turno = {
@@ -25,7 +26,11 @@ function diffHoras(inicio: string, fin: string) {
   return Math.round((minutos / 60) * 100) / 100; // 2 decimales
 }
 
-export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[] }) {
+export default function TurnosClient({
+  initialTurnos,
+}: {
+  initialTurnos: Turno[];
+}) {
   const [turnos, setTurnos] = useState<Turno[]>(initialTurnos);
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
@@ -54,7 +59,9 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
   const startEdit = (t: Turno) => {
     setEditingId(t.id);
     setNombre(t.nombre ?? "");
-    setSinHoras((t.horas_trabajadas ?? 0) === 0 && (!t.hora_inicio || !t.hora_fin));
+    setSinHoras(
+      (t.horas_trabajadas ?? 0) === 0 && (!t.hora_inicio || !t.hora_fin)
+    );
     setHoraInicio(t.hora_inicio ?? "");
     setHoraFin(t.hora_fin ?? "");
     setMsg("");
@@ -70,16 +77,18 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
 
     if (!sinHoras) {
       if (!horaInicio || !horaFin) {
-        setMsg("❌ Debes indicar hora inicio y fin (o marcar 'Turno sin horas').");
+        setMsg(
+          "❌ Debes indicar hora inicio y fin (o marcar 'Turno sin horas')."
+        );
         return;
       }
     }
 
-    const horas = sinHoras ? 0 : (horasCalculadas ?? 0);
+    const horas = sinHoras ? 0 : horasCalculadas ?? 0;
 
     setSaving(true);
 
-    const payload: any = {
+    const payload = {
       nombre: nombre.trim(),
       horas_trabajadas: horas,
       hora_inicio: sinHoras ? null : horaInicio,
@@ -90,7 +99,9 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
       ? supabase.from("horarios").update(payload).eq("id", editingId)
       : supabase.from("horarios").insert(payload);
 
-    const { data, error } = await q.select("id, nombre, hora_inicio, hora_fin, horas_trabajadas, created_at").single();
+    const { data, error } = await q
+      .select("id, nombre, hora_inicio, hora_fin, horas_trabajadas, created_at")
+      .single();
 
     setSaving(false);
 
@@ -135,7 +146,12 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
     setMsg("");
     setSaving(true);
 
-    const bases = [
+    const bases: Array<{
+      nombre: string;
+      hora_inicio: string | null;
+      hora_fin: string | null;
+      horas_trabajadas?: number;
+    }> = [
       { nombre: "06:00 a 14:00", hora_inicio: "06:00", hora_fin: "14:00" },
       { nombre: "14:00 a 22:00", hora_inicio: "14:00", hora_fin: "22:00" },
       { nombre: "22:00 a 06:00", hora_inicio: "22:00", hora_fin: "06:00" },
@@ -145,29 +161,34 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
       { nombre: "Incapacidad", hora_inicio: null, hora_fin: null, horas_trabajadas: 0 },
     ];
 
-    // insert uno por uno (para evitar duplicados por nombre)
     for (const b of bases) {
+      // si ya existe por nombre, skip
+      const exists = turnos.some((t) => t.nombre === b.nombre);
+      if (exists) continue;
+
       const horas =
         b.horas_trabajadas !== undefined
           ? b.horas_trabajadas
           : diffHoras(b.hora_inicio!, b.hora_fin!);
 
-      // si ya existe por nombre, skip
-      const exists = turnos.some((t) => t.nombre === b.nombre);
-      if (exists) continue;
-
       const { data, error } = await supabase
         .from("horarios")
         .insert({
           nombre: b.nombre,
-          hora_inicio: b.hora_inicio ?? null,
-          hora_fin: b.hora_fin ?? null,
+          hora_inicio: b.hora_inicio,
+          hora_fin: b.hora_fin,
           horas_trabajadas: horas,
         })
         .select("id, nombre, hora_inicio, hora_fin, horas_trabajadas, created_at")
         .single();
 
-      if (!error && data) {
+      if (error) {
+        // si uno falla, seguimos, pero mostramos el último error
+        setMsg("❌ Error creando turno base: " + error.message);
+        continue;
+      }
+
+      if (data) {
         setTurnos((prev) => [...prev, data as Turno]);
       }
     }
@@ -178,15 +199,26 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
 
   return (
     <div className="space-y-6">
+      {/* HEADER con botón Patrones */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Turnos</h1>
-        <button
-          onClick={crearBase}
-          disabled={saving}
-          className="border border-red-600 text-red-600 hover:bg-red-50 text-sm font-semibold px-4 py-2 rounded-md disabled:opacity-50"
-        >
-          Crear turnos base
-        </button>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/turnos/patrones"
+            className="border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold px-4 py-2 rounded-md"
+          >
+            Patrones semanales
+          </Link>
+
+          <button
+            onClick={crearBase}
+            disabled={saving}
+            className="border border-red-600 text-red-600 hover:bg-red-50 text-sm font-semibold px-4 py-2 rounded-md disabled:opacity-50"
+          >
+            Crear turnos base
+          </button>
+        </div>
       </div>
 
       {msg && <div className="bg-white rounded-lg shadow p-3 text-sm">{msg}</div>}
@@ -217,6 +249,7 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
               />
               Turno sin horas (0)
             </label>
+
             {horasCalculadas !== null && (
               <span className="text-xs text-gray-600">
                 Horas calculadas: <b>{horasCalculadas}</b>
