@@ -51,10 +51,9 @@ function toISODate(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// Devuelve el lunes de la semana del dateStr
 function mondayOf(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
-  const day = d.getDay(); // 0 domingo, 1 lunes...
+  const day = d.getDay(); // 0 domingo
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
   return d;
@@ -94,35 +93,18 @@ export default function RotacionClient({
   const [patrones] = useState<Patron[]>(initialPatrones);
   const [usuarios] = useState<Usuario[]>(initialUsuarios);
 
-  // Semana seleccionada (por defecto: hoy)
-  const [weekPick, setWeekPick] = useState<string>(() => {
-    const today = new Date();
-    return toISODate(today);
-  });
-
+  const [weekPick, setWeekPick] = useState<string>(() => toISODate(new Date()));
   const weekStart = useMemo(() => mondayOf(weekPick), [weekPick]);
   const weekStartISO = useMemo(() => toISODate(weekStart), [weekStart]);
   const weekEndISO = useMemo(() => toISODate(addDays(weekStart, 6)), [weekStart]);
 
-  // Admin: usuario seleccionado
   const [selectedUserId, setSelectedUserId] = useState<string>(() => sessionUserId);
-  const selectedUser = useMemo(() => {
-    if (!isAdmin) return { id: sessionUserId, nombre: sessionUserName } as any;
-    return usuarios.find((u) => u.id === selectedUserId) ?? null;
-  }, [isAdmin, usuarios, selectedUserId, sessionUserId, sessionUserName]);
 
-  // Admin: patrón
   const [selectedPatronId, setSelectedPatronId] = useState<number | "">("");
   const selectedPatron = useMemo(
     () => patrones.find((p) => p.id === selectedPatronId) ?? null,
     [patrones, selectedPatronId]
   );
-
-  const [msg, setMsg] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  // Turnos de la semana (leídos desde DB o previsualizados desde patrón)
-  const [turnosSemana, setTurnosSemana] = useState<TurnoDia[]>([]);
 
   const horariosById = useMemo(() => {
     const m = new Map<number, Horario>();
@@ -130,12 +112,20 @@ export default function RotacionClient({
     return m;
   }, [horarios]);
 
-  // Previsualización por patrón (admin)
+  const [msg, setMsg] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const [turnosSemana, setTurnosSemana] = useState<TurnoDia[]>([]);
+
+  // Modal edición día
+  const [editFecha, setEditFecha] = useState<string | null>(null);
+  const [editHorarioId, setEditHorarioId] = useState<number | "">("");
+
   const previewFromPatron = useMemo(() => {
     if (!selectedPatron) return null;
     const detalleMap = buildDetalleMap(selectedPatron.patrones_turnos_detalle);
 
-    const rows: TurnoDia[] = DIAS.map((d, idx) => {
+    return DIAS.map((d, idx) => {
       const fecha = toISODate(addDays(weekStart, idx));
       const horario_id = detalleMap[d.dia] ?? null;
       const h = horario_id ? horariosById.get(horario_id) : null;
@@ -143,14 +133,12 @@ export default function RotacionClient({
       return {
         fecha,
         horario_id,
-        nombre: h?.nombre ?? "—",
+        nombre: h?.nombre ?? "Sin turno",
         hora_inicio: h?.hora_inicio ?? null,
         hora_fin: h?.hora_fin ?? null,
         horas: Number(h?.horas_trabajadas ?? 0),
-      };
+      } as TurnoDia;
     });
-
-    return rows;
   }, [selectedPatron, weekStart, horariosById]);
 
   const totalHoras = useMemo(
@@ -163,17 +151,17 @@ export default function RotacionClient({
     return Math.max(0, totalHoras - topeHorasSemanales);
   }, [totalHoras, topeHorasSemanales]);
 
-  // Cargar turnos reales del usuario en esa semana
+  const uidActual = isAdmin ? selectedUserId : sessionUserId;
+
+  // Cargar semana desde DB
   const loadSemana = async () => {
     setMsg("");
-
-    const uid = isAdmin ? selectedUserId : sessionUserId;
-    if (!uid) return;
+    if (!uidActual) return;
 
     const { data, error } = await supabase
       .from("turnos")
-      .select("fecha, hora_inicio, hora_fin, horas_trabajadas")
-      .eq("usuario_id", uid)
+      .select("fecha, horario_id, hora_inicio, hora_fin, horas_trabajadas")
+      .eq("usuario_id", uidActual)
       .gte("fecha", weekStartISO)
       .lte("fecha", weekEndISO)
       .order("fecha", { ascending: true });
@@ -183,7 +171,6 @@ export default function RotacionClient({
       return;
     }
 
-    // Normalizar a L-D
     const map = new Map<string, any>();
     (data ?? []).forEach((t: any) => map.set(t.fecha, t));
 
@@ -191,10 +178,13 @@ export default function RotacionClient({
       const fecha = toISODate(addDays(weekStart, idx));
       const t = map.get(fecha);
 
+      const hid = (t?.horario_id ?? null) as number | null;
+      const h = hid ? horariosById.get(hid) : null;
+
       return {
         fecha,
-        horario_id: null, // no lo guardamos en turnos hoy; luego lo podemos agregar
-        nombre: t ? "Asignado" : "—",
+        horario_id: hid,
+        nombre: h?.nombre ?? (t ? "Asignado" : "Sin turno"),
         hora_inicio: t?.hora_inicio ?? null,
         hora_fin: t?.hora_fin ?? null,
         horas: Number(t?.horas_trabajadas ?? 0),
@@ -204,19 +194,19 @@ export default function RotacionClient({
     setTurnosSemana(rows);
   };
 
-  // Cuando cambia semana/usuario, recargar
   useEffect(() => {
     loadSemana();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekStartISO, weekEndISO, selectedUserId]);
 
-  // Si admin elige patrón: mostrar preview (sin guardar) para esa semana
+  // Si admin selecciona patrón: preview
   useEffect(() => {
     if (!isAdmin) return;
     if (previewFromPatron) setTurnosSemana(previewFromPatron);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPatronId, weekStartISO]);
 
+  // Guardar rotación (genera los 7 días)
   const guardarAsignacion = async () => {
     setMsg("");
 
@@ -234,19 +224,13 @@ export default function RotacionClient({
 
     const u = usuarios.find((x) => x.id === selectedUserId);
     if (u?.estado === "bloqueado") {
-      setMsg("❌ Este usuario está bloqueado. Desbloquéalo para asignar rotación.");
+      setMsg("❌ Este usuario está bloqueado.");
       return;
-    }
-
-    // Validación “suave”: si pasa el tope, igual deja guardar (tú decides)
-    // Aquí solo avisamos:
-    if (topeHorasSemanales > 0 && totalHoras > topeHorasSemanales) {
-      // no bloqueamos, solo warning
     }
 
     setSaving(true);
 
-    // 1) Guardar rotación (upsert por unique(usuario_id, semana_inicio))
+    // 1) upsert rotación
     const { error: rotErr } = await supabase
       .from("rotaciones")
       .upsert(
@@ -260,8 +244,7 @@ export default function RotacionClient({
       return;
     }
 
-    // 2) Reemplazar turnos en tabla turnos para esa semana
-    // (borramos semana y volvemos a insertar)
+    // 2) borrar semana previa (para regenerar)
     const { error: delErr } = await supabase
       .from("turnos")
       .delete()
@@ -271,11 +254,11 @@ export default function RotacionClient({
 
     if (delErr) {
       setSaving(false);
-      setMsg("❌ Error limpiando turnos de la semana: " + delErr.message);
+      setMsg("❌ Error limpiando turnos: " + delErr.message);
       return;
     }
 
-    // 3) Insertar turnos diarios desde preview (patrón)
+    // 3) insertar los 7 días
     const detalleMap = buildDetalleMap(selectedPatron?.patrones_turnos_detalle);
 
     const rowsToInsert = DIAS.map((d, idx) => {
@@ -283,10 +266,10 @@ export default function RotacionClient({
       const horario_id = detalleMap[d.dia] ?? null;
       const h = horario_id ? horariosById.get(horario_id) : null;
 
-      // si el patrón no asigna turno ese día, guardamos 0 horas (y horas null)
       return {
         usuario_id: selectedUserId,
         fecha,
+        horario_id,
         hora_inicio: h?.hora_inicio ?? null,
         hora_fin: h?.hora_fin ?? null,
         horas_trabajadas: Number(h?.horas_trabajadas ?? 0),
@@ -303,26 +286,69 @@ export default function RotacionClient({
     }
 
     setMsg(
-      `✅ Rotación guardada para la semana ${weekStartISO} → ${weekEndISO}. ` +
+      `✅ Rotación guardada (${weekStartISO} → ${weekEndISO}).` +
         (topeHorasSemanales > 0 && totalHoras > topeHorasSemanales
-          ? `⚠️ Pasa el tope (${totalHoras}h > ${topeHorasSemanales}h). Extras: ${extras}h.`
+          ? ` ⚠️ Extras: ${extras}h.`
           : "")
     );
 
-    // recargar desde DB
+    await loadSemana();
+  };
+
+  // Abrir edición por día
+  const abrirEditarDia = (t: TurnoDia) => {
+    if (!isAdmin) return; // solo admin edita
+    setEditFecha(t.fecha);
+    setEditHorarioId(t.horario_id ?? "");
+    setMsg("");
+  };
+
+  // Guardar edición de un día
+  const guardarDia = async () => {
+    if (!isAdmin) return;
+    if (!editFecha) return;
+
+    const horario_id = editHorarioId === "" ? null : Number(editHorarioId);
+    const h = horario_id ? horariosById.get(horario_id) : null;
+
+    setSaving(true);
+
+    // upsert por (usuario_id, fecha) gracias al índice unique
+    const { error } = await supabase
+      .from("turnos")
+      .upsert(
+        {
+          usuario_id: uidActual,
+          fecha: editFecha,
+          horario_id,
+          hora_inicio: h?.hora_inicio ?? null,
+          hora_fin: h?.hora_fin ?? null,
+          horas_trabajadas: Number(h?.horas_trabajadas ?? 0),
+        },
+        { onConflict: "usuario_id,fecha" }
+      );
+
+    setSaving(false);
+
+    if (error) {
+      setMsg("❌ Error guardando día: " + error.message);
+      return;
+    }
+
+    setMsg("✅ Día actualizado.");
+    setEditFecha(null);
+    setEditHorarioId("");
     await loadSemana();
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Rotación</h1>
       </div>
 
       {msg && <div className="bg-white rounded-lg shadow p-3 text-sm">{msg}</div>}
 
-      {/* Controles */}
       <section className="bg-white rounded-lg shadow p-4 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
@@ -353,9 +379,6 @@ export default function RotacionClient({
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {selectedUser?.rol_nombre ? `Rol: ${selectedUser.rol_nombre}` : ""}
-                </p>
               </div>
 
               <div>
@@ -380,7 +403,7 @@ export default function RotacionClient({
               <div className="border rounded-md px-3 py-2 text-sm bg-gray-50">
                 {sessionUserName}
               </div>
-              <p className="text-xs text-gray-500 mt-1">Solo visualización (operador).</p>
+              <p className="text-xs text-gray-500 mt-1">Solo visualización.</p>
             </div>
           )}
         </div>
@@ -408,7 +431,6 @@ export default function RotacionClient({
         </div>
       </section>
 
-      {/* Calendario semanal */}
       <section className="bg-white rounded-lg shadow p-4">
         <h2 className="text-sm font-semibold mb-3">Vista semanal</h2>
 
@@ -418,11 +440,14 @@ export default function RotacionClient({
             const hasShift = (t.horas ?? 0) > 0;
 
             return (
-              <div
+              <button
                 key={t.fecha}
-                className={`rounded-lg border p-3 ${
-                  hasShift ? "border-gray-200" : "border-dashed border-gray-300"
-                }`}
+                onClick={() => abrirEditarDia(t)}
+                className={`text-left rounded-lg border p-3 transition ${
+                  hasShift ? "border-gray-200 hover:bg-gray-50" : "border-dashed border-gray-300 hover:bg-gray-50"
+                } ${isAdmin ? "cursor-pointer" : "cursor-default"}`}
+                disabled={!isAdmin}
+                title={isAdmin ? "Click para editar este día" : ""}
               >
                 <div className="text-xs text-gray-500">{label}</div>
                 <div className="text-sm font-semibold">{t.fecha}</div>
@@ -439,10 +464,13 @@ export default function RotacionClient({
                       </div>
                     </>
                   ) : (
-                    <div className="text-sm text-gray-500">Sin turno</div>
+                    <>
+                      <div className="text-sm text-gray-500">Sin turno</div>
+                      <div className="text-xs mt-1">Horas: <b>0</b></div>
+                    </>
                   )}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -450,12 +478,52 @@ export default function RotacionClient({
         {extras > 0 && (
           <div className="mt-4 bg-red-50 border border-red-200 text-red-700 rounded-md p-3 text-sm">
             ⚠️ Esta semana supera el tope. Extras estimadas: <b>{extras}h</b>.
-            <div className="text-xs mt-1">
-              (En el siguiente paso calculamos extras por franja: diurna/nocturna/festivo/dominical.)
-            </div>
           </div>
         )}
       </section>
+
+      {/* Modal edición */}
+      {isAdmin && editFecha && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-4">
+            <h3 className="text-lg font-bold mb-2">Editar día: {editFecha}</h3>
+
+            <label className="block text-xs font-medium mb-1">Turno</label>
+            <select
+              className="w-full border rounded-md px-3 py-2 text-sm"
+              value={editHorarioId}
+              onChange={(e) => setEditHorarioId(e.target.value ? Number(e.target.value) : "")}
+            >
+              <option value="">— Sin turno —</option>
+              {horarios.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.nombre} {h.hora_inicio && h.hora_fin ? `(${h.hora_inicio}–${h.hora_fin})` : ""} - {h.horas_trabajadas}h
+                </option>
+              ))}
+            </select>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={guardarDia}
+                disabled={saving}
+                className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-md disabled:opacity-50"
+              >
+                {saving ? "Guardando..." : "Guardar"}
+              </button>
+
+              <button
+                onClick={() => {
+                  setEditFecha(null);
+                  setEditHorarioId("");
+                }}
+                className="border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold px-4 py-2 rounded-md"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
