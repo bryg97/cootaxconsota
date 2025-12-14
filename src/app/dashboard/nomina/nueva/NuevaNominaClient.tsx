@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -78,6 +78,80 @@ export default function NuevaNominaClient({
     [festivos]
   );
 
+  // Función para detectar si un tramo es nocturno (22:00-06:00)
+  const calcularHorasNocturnas = (tramos: any[]) => {
+    if (!tramos || !Array.isArray(tramos)) return 0;
+    
+    let horasNocturnas = 0;
+    
+    tramos.forEach((tramo) => {
+      const inicio = tramo.inicio || "";
+      const fin = tramo.fin || "";
+      
+      const [hIni, mIni] = inicio.split(":").map(Number);
+      const [hFin, mFin] = fin.split(":").map(Number);
+      
+      if (isNaN(hIni) || isNaN(mIni) || isNaN(hFin) || isNaN(mFin)) return;
+      
+      const minIni = hIni * 60 + mIni;
+      let minFin = hFin * 60 + mFin;
+      
+      // Si cruza medianoche
+      if (minFin < minIni) minFin += 24 * 60;
+      
+      // Horario nocturno: 22:00 (1320 min) hasta 06:00 (360 min del día siguiente)
+      const nocheInicio = 22 * 60; // 1320
+      const nocheFin = 6 * 60; // 360 (del siguiente día)
+      
+      // Caso 1: Todo el tramo es nocturno (22:00-06:00)
+      if (minIni >= nocheInicio || minFin <= nocheFin) {
+        horasNocturnas += (minFin - minIni) / 60;
+      }
+      // Caso 2: El tramo cruza 22:00 (ej: 20:00-23:00)
+      else if (minIni < nocheInicio && minFin > nocheInicio) {
+        horasNocturnas += (minFin - nocheInicio) / 60;
+      }
+      // Caso 3: El tramo cruza 06:00 (ej: 04:00-08:00)
+      else if (minIni < nocheFin && minFin > nocheFin) {
+        horasNocturnas += (nocheFin - minIni) / 60;
+      }
+    });
+    
+    return horasNocturnas;
+  };
+
+  const horarioById = useMemo(() => {
+    const map = new Map<number, Horario>();
+    horarios.forEach((h) => map.set(h.id, h));
+    return map;
+  }, [horarios]);
+
+  const [turnosPorUsuario, setTurnosPorUsuario] = useState<Record<string, any[]>>({});
+  const [cargandoTurnos, setCargandoTurnos] = useState(false);
+
+  // Cargar turnos del periodo
+  useEffect(() => {
+    if (!fechaInicio || !fechaFin) return;
+
+    (async () => {
+      setCargandoTurnos(true);
+      const { data: turnos } = await supabase
+        .from("turnos")
+        .select("usuario_id, fecha, horario_id")
+        .gte("fecha", fechaInicio)
+        .lte("fecha", fechaFin);
+
+      const porUsuario: Record<string, any[]> = {};
+      (turnos || []).forEach((t) => {
+        if (!porUsuario[t.usuario_id]) porUsuario[t.usuario_id] = [];
+        porUsuario[t.usuario_id].push(t);
+      });
+
+      setTurnosPorUsuario(porUsuario);
+      setCargandoTurnos(false);
+    })();
+  }, [fechaInicio, fechaFin]);
+
   // Calcular nómina para cada usuario
   const nominaCalculada = useMemo(() => {
     return usuarios.map((u) => {
@@ -85,23 +159,49 @@ export default function NuevaNominaClient({
       const salarioPeriodo = tipo === "quincenal" ? salarioBase / 2 : salarioBase;
       const auxilioPeriodo = tipo === "quincenal" ? auxilioTransporte / 2 : auxilioTransporte;
       const fondoPeriodo = tipo === "quincenal" ? fondoSolidario / 2 : fondoSolidario;
-
-      // AQUÍ deberías calcular las horas trabajadas, extras y recargos
-      // consultando la tabla `turnos` entre fechaInicio y fechaFin
-      // Por ahora dejamos valores en 0 como ejemplo
-      
-      const horasTrabajadas = 0; // TODO: Calcular desde turnos
-      const horasExtras = 0; // TODO: Calcular si supera horas semanales
       const valorHora = salarioBase / horasMensuales;
-      const valorHorasExtras = horasExtras * valorHora * 1.25; // 25% adicional
 
-      // Recargos (ejemplo, necesitas calcular según turnos y horas)
-      const horasRecargoNocturno = 0;
+      const turnosUsuario = turnosPorUsuario[u.id] || [];
+      
+      let horasTrabajadas = 0;
+      let horasRecargoNocturno = 0;
+      let horasRecargoFestivo = 0;
+      let horasRecargoDominical = 0;
+
+      // Calcular horas por cada turno
+      turnosUsuario.forEach((turno) => {
+        const horario = horarioById.get(turno.horario_id);
+        if (!horario) return;
+
+        const fecha = turno.fecha;
+        const esFestivo = festivosSet.has(fecha);
+        const esDomingo = new Date(fecha + "T00:00:00").getDay() === 0;
+        
+        const horasTurno = horario.horas_trabajadas || 0;
+        horasTrabajadas += horasTurno;
+
+        // Calcular horas nocturnas del horario
+        const horasNocturnasTurno = calcularHorasNocturnas(horario.tramos || []);
+
+        // Los recargos tienen prioridad: festivo > dominical > nocturno
+        if (esFestivo) {
+          horasRecargoFestivo += horasTurno;
+        } else if (esDomingo) {
+          horasRecargoDominical += horasTurno;
+        } else if (horasNocturnasTurno > 0) {
+          horasRecargoNocturno += horasNocturnasTurno;
+        }
+      });
+
+      // Calcular horas extras (si supera tope del periodo)
+      const horasTopePeriodo = tipo === "quincenal" ? horasMensuales / 2 : horasMensuales;
+      const horasExtras = Math.max(0, horasTrabajadas - horasTopePeriodo);
+      const horasNormales = horasTrabajadas - horasExtras;
+
+      const valorHorasExtras = horasExtras * valorHora * 1.25;
       const valorRecargoNocturno = horasRecargoNocturno * valorHora * 0.35;
-      const horasRecargoFestivo = 0;
-      const valorRecargoFestivo = 0;
-      const horasRecargoDominical = 0;
-      const valorRecargoDominical = 0;
+      const valorRecargoFestivo = horasRecargoFestivo * valorHora * 0.75;
+      const valorRecargoDominical = horasRecargoDominical * valorHora * 0.75;
 
       const totalRecargos =
         valorRecargoNocturno + valorRecargoFestivo + valorRecargoDominical;
@@ -359,21 +459,11 @@ export default function NuevaNominaClient({
       <div className="flex justify-end">
         <button
           onClick={procesarNomina}
-          disabled={procesando}
+          disabled={procesando || cargandoTurnos}
           className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-6 py-3 rounded-md disabled:opacity-50"
         >
-          {procesando ? "Procesando..." : "Procesar Nómina"}
+          {cargandoTurnos ? "Cargando turnos..." : procesando ? "Procesando..." : "Procesar Nómina"}
         </button>
-      </div>
-
-      {/* Nota sobre cálculo de horas */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm">
-        <p className="font-semibold text-yellow-800">⚠️ Nota de desarrollo:</p>
-        <p className="text-yellow-700 mt-1">
-          El cálculo de horas trabajadas, extras y recargos aún está pendiente de implementar.
-          Actualmente muestra valores en 0. Se debe integrar con la tabla `turnos` para calcular
-          las horas reales trabajadas por cada empleado en el periodo seleccionado.
-        </p>
       </div>
     </div>
   );
