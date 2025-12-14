@@ -230,17 +230,60 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
     setMsg("✅ Turnos base listos (se omitieron los que ya existían).");
   };
 
+  const recalcularHoras = async () => {
+    if (!confirm("¿Recalcular las horas de todos los turnos basándose en sus tramos? Esto actualizará la base de datos.")) {
+      return;
+    }
+
+    setMsg("");
+    setSaving(true);
+
+    let actualizados = 0;
+    for (const t of turnos) {
+      const tTramos = sanitizeTramos(t.tramos);
+      const horasReales = tTramos.length > 0 
+        ? Math.round(sumHorasTramos(tTramos) * 100) / 100 
+        : 0;
+
+      // Solo actualizamos si las horas son diferentes
+      if (horasReales !== (t.horas_trabajadas ?? 0)) {
+        const { error } = await supabase
+          .from("horarios")
+          .update({ horas_trabajadas: horasReales })
+          .eq("id", t.id);
+
+        if (!error) {
+          actualizados++;
+          // Actualizamos el estado local
+          setTurnos((prev) => prev.map((x) => x.id === t.id ? { ...x, horas_trabajadas: horasReales } : x));
+        }
+      }
+    }
+
+    setSaving(false);
+    setMsg(`✅ Se recalcularon y actualizaron ${actualizados} turnos.`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Turnos</h1>
-        <button
-          onClick={crearBase}
-          disabled={saving}
-          className="border border-red-600 text-red-600 hover:bg-red-50 text-sm font-semibold px-4 py-2 rounded-md disabled:opacity-50"
-        >
-          Crear turnos base
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={recalcularHoras}
+            disabled={saving}
+            className="border border-blue-600 text-blue-600 hover:bg-blue-50 text-sm font-semibold px-4 py-2 rounded-md disabled:opacity-50"
+          >
+            Recalcular horas
+          </button>
+          <button
+            onClick={crearBase}
+            disabled={saving}
+            className="border border-red-600 text-red-600 hover:bg-red-50 text-sm font-semibold px-4 py-2 rounded-md disabled:opacity-50"
+          >
+            Crear turnos base
+          </button>
+        </div>
       </div>
 
       {msg && <div className="bg-white rounded-lg shadow p-3 text-sm">{msg}</div>}
@@ -381,11 +424,15 @@ export default function TurnosClient({ initialTurnos }: { initialTurnos: Turno[]
             <tbody>
               {turnos.map((t) => {
                 const tTramos = sanitizeTramos(t.tramos);
+                // Recalculamos las horas basándonos en los tramos para asegurar precisión
+                const horasReales = tTramos.length > 0 
+                  ? Math.round(sumHorasTramos(tTramos) * 100) / 100 
+                  : (t.horas_trabajadas ?? 0);
                 return (
                   <tr key={t.id} className="border-b hover:bg-gray-50">
                     <td className="px-3 py-2 font-medium">{t.nombre}</td>
                     <td className="px-3 py-2">{tramosToText(tTramos)}</td>
-                    <td className="px-3 py-2">{t.horas_trabajadas ?? 0}</td>
+                    <td className="px-3 py-2">{horasReales}</td>
                     <td className="px-3 py-2 space-x-2">
                       <button
                         onClick={() => startEdit(t)}

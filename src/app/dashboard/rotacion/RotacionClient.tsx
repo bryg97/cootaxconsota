@@ -168,11 +168,14 @@ export default function RotacionClient() {
     (async () => {
       setMsg("");
 
+      // Incluimos el domingo anterior para capturar turnos que cruzan a lunes
+      const prevSunday = addDays(weekStart, -1);
+
       const { data, error } = await supabase
         .from("turnos")
         .select("fecha, horario_id")
         .eq("usuario_id", usuarioId)
-        .gte("fecha", weekStart)
+        .gte("fecha", prevSunday)
         .lte("fecha", weekDays[6]);
 
       if (error) {
@@ -182,6 +185,9 @@ export default function RotacionClient() {
 
       const m: Record<string, number | null> = {};
       for (const d of weekDays) m[d] = null;
+      // También incluimos el domingo anterior si existe
+      m[prevSunday] = null;
+      
       (data ?? []).forEach((r: any) => {
         m[r.fecha] = r.horario_id ?? null;
       });
@@ -197,37 +203,70 @@ export default function RotacionClient() {
 
   // Construye vista semanal con split por medianoche (solo para mostrar/cálculo)
   const weekView = useMemo(() => {
-    // Para esta semana, armamos segmentos por fecha DENTRO de la semana.
-    // Lo que caiga en lunes de la siguiente semana NO se suma aquí.
+    // Para cada día de la semana, recolectamos TODOS los segmentos que caen en ese día,
+    // incluyendo los que vienen de turnos del día anterior que cruzan medianoche.
     const perDay: Record<string, { nombre: string; segmentos: Array<{ inicio: string; fin: string }>; horas: number }> = {};
 
-    for (const date of weekDays) {
+    // Primero, recolectamos TODOS los segmentos de TODOS los días (incluyendo día anterior)
+    const allSegments: Array<{ fecha: string; inicio: string; fin: string; fromDate: string; nombre: string }> = [];
+
+    // Incluimos el domingo de la semana anterior para capturar turnos que cruzan a lunes
+    const prevSunday = addDays(weekStart, -1);
+    const extendedDays = [prevSunday, ...weekDays];
+
+    for (const date of extendedDays) {
       const horarioId = weekMap[date] ?? null;
-      if (!horarioId) {
-        perDay[date] = { nombre: "Sin turno", segmentos: [], horas: 0 };
-        continue;
-      }
+      if (!horarioId) continue;
 
       const h = horarioById.get(horarioId);
       const tramos = sanitizeTramos(h?.tramos);
       const segs = tramosForDayWithSplit(date, tramos);
 
-      // dejamos SOLO segmentos del mismo date (lo de 00:00–xx que cae en date+1 se ignora en esta semana)
-      const sameDaySegs = segs.filter((s) => s.fecha === date);
+      segs.forEach((s) => {
+        allSegments.push({ ...s, fromDate: date, nombre: h?.nombre ?? "Turno" });
+      });
+    }
 
-      const horas = Math.round(
-        sameDaySegs.reduce((acc, s) => acc + diffHoras(s.inicio, s.fin), 0) * 100
-      ) / 100;
+    // Ahora, para cada día de la semana actual, filtramos los segmentos que caen en ese día
+    for (const date of weekDays) {
+      const daySegments = allSegments.filter((s) => s.fecha === date);
 
-      perDay[date] = {
-        nombre: h?.nombre ?? "Turno",
-        segmentos: sameDaySegs.map((s) => ({ inicio: s.inicio, fin: s.fin })),
-        horas,
-      };
+      if (daySegments.length === 0) {
+        // Si no hay segmentos, verificamos si hay un turno asignado directamente
+        const horarioId = weekMap[date] ?? null;
+        if (!horarioId) {
+          perDay[date] = { nombre: "Sin turno", segmentos: [], horas: 0 };
+        } else {
+          // Tiene turno asignado pero no generó segmentos en este día (puede ser turno sin horas)
+          const h = horarioById.get(horarioId);
+          perDay[date] = { nombre: h?.nombre ?? "Turno", segmentos: [], horas: 0 };
+        }
+      } else {
+        // Calculamos las horas sumando TODOS los segmentos de este día
+        const horas = Math.round(
+          daySegments.reduce((acc, s) => acc + diffHoras(s.inicio, s.fin), 0) * 100
+        ) / 100;
+
+        // Nombre: mostramos el del turno principal del día, o si viene de otro día lo indicamos
+        const mainHorario = weekMap[date] ? horarioById.get(weekMap[date]!) : null;
+        let nombre = mainHorario?.nombre ?? "Turno";
+
+        // Si hay segmentos de otros días, los agregamos a la descripción
+        const fromOtherDays = daySegments.filter((s) => s.fromDate !== date);
+        if (fromOtherDays.length > 0 && !mainHorario) {
+          nombre = fromOtherDays[0].nombre + " (del día anterior)";
+        }
+
+        perDay[date] = {
+          nombre,
+          segmentos: daySegments.map((s) => ({ inicio: s.inicio, fin: s.fin })),
+          horas,
+        };
+      }
     }
 
     return perDay;
-  }, [weekDays, weekMap, horarioById]);
+  }, [weekDays, weekMap, horarioById, weekStart]);
 
   const totalSemana = useMemo(() => {
     return Math.round(weekDays.reduce((acc, d) => acc + (weekView[d]?.horas ?? 0), 0) * 100) / 100;
@@ -378,11 +417,18 @@ export default function RotacionClient() {
         {extras > 0 && (
           <div className="mt-3 bg-red-50 border border-red-200 text-red-700 rounded-md p-3 text-sm">
             ⚠️ Esta semana supera el tope. Extras estimadas: <b>{extras}h</b>.
-            <div className="text-xs mt-1 text-red-600">
-              Nota: si un turno cruza medianoche en domingo, las horas después de las 00:00 van al lunes (otra semana).
-            </div>
           </div>
         )}
+
+        <div className="mt-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-md p-3 text-xs">
+          <div className="font-semibold mb-1">ℹ️ Información importante sobre turnos que cruzan medianoche:</div>
+          <ul className="list-disc list-inside space-y-1">
+            <li>Cuando un turno cruza medianoche (ej: 22:00 a 06:00), las horas se dividen entre los dos días.</li>
+            <li>Las horas de cada día se suman correctamente, incluyendo las que vienen del día anterior.</li>
+            <li>Ejemplo: Domingo 22:00-06:00 = 2h del domingo + 6h del lunes (siguiente semana).</li>
+            <li>El sistema calcula automáticamente las horas correctas para cada día de la semana.</li>
+          </ul>
+        </div>
       </section>
 
       {/* Vista semanal + edición por día */}
