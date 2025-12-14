@@ -10,7 +10,8 @@ type Configuracion = {
   horas_semanales?: number | null;
   recargo_nocturno_inicio?: string | null;
   recargo_nocturno_fin?: string | null;
-  // aquí luego agregas los nuevos campos de recargos festivos/dominicales
+  auxilio_transporte?: number | null; // Valor mensual
+  fondo_solidario?: number | null; // Valor mensual
 };
 
 interface Props {
@@ -23,6 +24,12 @@ export default function ConfiguracionForm({ initialConfig }: Props) {
   );
   const [horasSemanales, setHorasSemanales] = useState<number | "">(
     initialConfig?.horas_semanales ?? ""
+  );
+  const [auxilioTransporte, setAuxilioTransporte] = useState<number | "">(
+    initialConfig?.auxilio_transporte ?? ""
+  );
+  const [fondoSolidario, setFondoSolidario] = useState<number | "">(
+    initialConfig?.fondo_solidario ?? ""
   );
   const [salarioEjemplo, setSalarioEjemplo] = useState<number | "">(0);
   const [saving, setSaving] = useState(false);
@@ -64,7 +71,10 @@ export default function ConfiguracionForm({ initialConfig }: Props) {
         horasMensuales === "" ? null : Number(horasMensuales),
       horas_semanales:
         horasSemanales === "" ? null : Number(horasSemanales),
-      // aquí luego agregarías los campos de horarios de recargos
+      auxilio_transporte:
+        auxilioTransporte === "" ? null : Number(auxilioTransporte),
+      fondo_solidario:
+        fondoSolidario === "" ? null : Number(fondoSolidario),
     };
 
     let error;
@@ -137,6 +147,56 @@ export default function ConfiguracionForm({ initialConfig }: Props) {
               }
               min={0}
             />
+          </div>
+        </div>
+
+        <div className="mt-4 border-t pt-4">
+          <h2 className="text-lg font-semibold mb-2">
+            Nómina - Valores fijos mensuales
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Auxilio de transporte (mensual)
+              </label>
+              <input
+                type="number"
+                className="w-full border rounded-md px-3 py-2 text-sm"
+                value={auxilioTransporte}
+                onChange={(e) =>
+                  setAuxilioTransporte(
+                    e.target.value === "" ? "" : Number(e.target.value)
+                  )
+                }
+                min={0}
+                placeholder="Ej: 200000"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Se divide entre 2 para nómina quincenal
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Fondo solidario (mensual)
+              </label>
+              <input
+                type="number"
+                className="w-full border rounded-md px-3 py-2 text-sm"
+                value={fondoSolidario}
+                onChange={(e) =>
+                  setFondoSolidario(
+                    e.target.value === "" ? "" : Number(e.target.value)
+                  )
+                }
+                min={0}
+                placeholder="Ej: 50000"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Se divide entre 2 para nómina quincenal (deducción)
+              </p>
+            </div>
           </div>
         </div>
 
