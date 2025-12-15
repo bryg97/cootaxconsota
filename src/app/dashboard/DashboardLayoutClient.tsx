@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import SessionControl from "@/components/SessionControl";
 
 type Props = {
   children: ReactNode;
@@ -83,7 +84,10 @@ export default function DashboardLayoutClient({
         </div>
       </aside>
 
-      <main className="flex-1 p-6 bg-[#f3f4f6]">{children}</main>
+      <main className="flex-1 p-6 bg-[#f3f4f6]">
+        <SessionControl />
+        {children}
+      </main>
     </div>
   );
 }
