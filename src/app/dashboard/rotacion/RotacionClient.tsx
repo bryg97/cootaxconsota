@@ -284,22 +284,25 @@ export default function RotacionClient({
     const patron = patrones.find((p) => String(p.id) === String(patronId));
     if (!patron) return;
 
-    // Se asume que patron.dias tiene algo como:
-    // { lunes: horario_id, martes: horario_id, ..., domingo: horario_id }
-    // Si tu estructura difiere, me dices cómo guardas el patrón y lo ajusto.
-    const dias = (patron as any).dias ?? {};
+    // patron tiene patrones_turnos_detalle: [{ dia: 1-7, horario_id: number | null }, ...]
+    // dia 1=lunes, 2=martes, ..., 7=domingo
+    const detalle = (patron as any).patrones_turnos_detalle ?? [];
 
     const mapCopy: Record<string, number | null> = { ...weekMap };
 
-    const keys = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
+    // Mapear cada día del patrón a la fecha correspondiente de la semana
     for (let i = 0; i < 7; i++) {
-      const k = keys[i];
-      const date = weekDays[i];
-      const horarioId = dias?.[k] ?? null;
+      const date = weekDays[i]; // fecha ISO de la semana
+      const diaNumero = i + 1; // 1=lunes, 2=martes, ..., 7=domingo
+      
+      const entry = detalle.find((d: any) => d.dia === diaNumero);
+      const horarioId = entry?.horario_id ?? null;
+      
       mapCopy[date] = horarioId ? Number(horarioId) : null;
     }
 
     setWeekMap(mapCopy);
+    setMsg("✅ Patrón aplicado. Recuerda guardar los cambios.");
   };
 
   const saveRotacion = async () => {
