@@ -40,9 +40,15 @@ export default async function DashboardHomePage() {
     .lte("fecha", fechaFin)
     .order("fecha", { ascending: true });
 
-  // Mapear turnos para formato correcto (filtrar turnos con 0 horas)
+  // Mapear turnos para formato correcto
+  // NO filtrar turnos con 0 horas si son "descanso obligatorio"
   const turnos = (turnosData || [])
-    .filter((t: any) => (t.horarios?.horas_trabajadas || 0) > 0)
+    .filter((t: any) => {
+      const horas = t.horarios?.horas_trabajadas || 0;
+      const nombre = (t.horarios?.nombre || "").toLowerCase();
+      // Mantener si tiene horas O si es descanso obligatorio
+      return horas > 0 || nombre.includes("descanso");
+    })
     .map((t: any) => ({
       fecha: t.fecha,
       horario_id: t.horario_id,
