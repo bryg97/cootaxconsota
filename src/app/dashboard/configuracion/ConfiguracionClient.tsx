@@ -1,7 +1,7 @@
 // src/app/dashboard/configuracion/ConfiguracionClient.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type Formulas = {
@@ -289,23 +289,6 @@ export default function ConfiguracionClient({
       [key]: toNum(value, prev[key]),
     }));
   };
-
-  const formulasTexto = useMemo(
-    () => [
-      `Valor de la hora = salario base / divisor mensual (${formulas.valor_hora_divisor_mensual})`,
-      `Valor día = salario base / divisor día (${formulas.valor_dia_divisor})`,
-      `Recargo nocturno ordinario (lun-sáb, no festivo) = valor hora * ${formulas.recargo_nocturno_ordinario}`,
-      `Recargo diurno festivo = valor hora * ${formulas.recargo_diurno_festivo}`,
-      `Recargo nocturno festivo = valor hora * ${formulas.recargo_nocturno_festivo}`,
-      `Recargo diurno domingo = valor hora * ${formulas.recargo_diurno_domingo}`,
-      `Recargo nocturno domingo = valor hora * ${formulas.recargo_nocturno_domingo}`,
-      `Hora extra diurna (lun-sáb no festivo) = valor hora * ${formulas.extra_diurna_ordinaria}`,
-      `Hora extra nocturna (lun-sáb no festivo) = valor hora * ${formulas.extra_nocturna_ordinaria}`,
-      `Hora extra diurna (domingos o festivos) = valor hora * ${formulas.extra_diurna_festivo_domingo}`,
-      `Hora extra nocturna (domingos o festivos) = valor hora * ${formulas.extra_nocturna_festivo_domingo}`,
-    ],
-    [formulas]
-  );
 
   const FormulaField = ({
     label,
@@ -645,14 +628,87 @@ export default function ConfiguracionClient({
         </div>
       </section>
 
-      {/* Fórmulas (texto) */}
+      {/* Fórmulas de cálculo de nómina */}
       <section className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-sm font-semibold mb-3">Fórmulas (referencia)</h2>
-        <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
-          {formulasTexto.map((f) => (
-            <li key={f}>{f}</li>
-          ))}
-        </ul>
+        <h2 className="text-sm font-semibold mb-4">Fórmulas de cálculo de nómina</h2>
+
+        <div className="space-y-4">
+          {/* Valores base */}
+          <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg">
+            <h3 className="text-sm font-bold text-blue-900 mb-2">📊 Valores Base</h3>
+            <ul className="list-disc pl-5 text-sm text-gray-800 space-y-1">
+              <li>
+                <strong>Valor hora:</strong> Salario base ÷ {formulas.valor_hora_divisor_mensual}
+              </li>
+              <li>
+                <strong>Valor día:</strong> Salario base ÷ {formulas.valor_dia_divisor}
+              </li>
+            </ul>
+          </div>
+
+          {/* Recargos ordinarios */}
+          <div className="border-l-4 border-purple-500 bg-purple-50 p-4 rounded-r-lg">
+            <h3 className="text-sm font-bold text-purple-900 mb-2">🌙 Recargos Ordinarios</h3>
+            <ul className="list-disc pl-5 text-sm text-gray-800 space-y-1">
+              <li>
+                <strong>Nocturno (lun-sáb):</strong> Valor hora × {formulas.recargo_nocturno_ordinario} (
+                {(formulas.recargo_nocturno_ordinario * 100).toFixed(0)}%)
+              </li>
+              <li>
+                <strong>Diurno festivo:</strong> Valor hora × {formulas.recargo_diurno_festivo} (
+                {(formulas.recargo_diurno_festivo * 100).toFixed(0)}%)
+              </li>
+              <li>
+                <strong>Nocturno festivo:</strong> Valor hora × {formulas.recargo_nocturno_festivo} (
+                {(formulas.recargo_nocturno_festivo * 100).toFixed(0)}%)
+              </li>
+              <li>
+                <strong>Diurno domingo:</strong> Valor hora × {formulas.recargo_diurno_domingo} (
+                {(formulas.recargo_diurno_domingo * 100).toFixed(0)}%)
+              </li>
+              <li>
+                <strong>Nocturno domingo:</strong> Valor hora × {formulas.recargo_nocturno_domingo} (
+                {(formulas.recargo_nocturno_domingo * 100).toFixed(0)}%)
+              </li>
+            </ul>
+          </div>
+
+          {/* Horas extras */}
+          <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
+            <h3 className="text-sm font-bold text-green-900 mb-2">⏰ Horas Extras</h3>
+            <ul className="list-disc pl-5 text-sm text-gray-800 space-y-1">
+              <li>
+                <strong>Extra diurna (lun-sáb):</strong> Valor hora × {formulas.extra_diurna_ordinaria} (
+                {(formulas.extra_diurna_ordinaria * 100).toFixed(0)}%)
+              </li>
+              <li>
+                <strong>Extra nocturna (lun-sáb):</strong> Valor hora × {formulas.extra_nocturna_ordinaria} (
+                {(formulas.extra_nocturna_ordinaria * 100).toFixed(0)}%)
+              </li>
+              <li>
+                <strong>Extra diurna (dom/fest):</strong> Valor hora × {formulas.extra_diurna_festivo_domingo} (
+                {(formulas.extra_diurna_festivo_domingo * 100).toFixed(0)}%)
+              </li>
+              <li>
+                <strong>Extra nocturna (dom/fest):</strong> Valor hora × {formulas.extra_nocturna_festivo_domingo} (
+                {(formulas.extra_nocturna_festivo_domingo * 100).toFixed(0)}%)
+              </li>
+            </ul>
+          </div>
+
+          {/* Deducciones */}
+          <div className="border-l-4 border-red-500 bg-red-50 p-4 rounded-r-lg">
+            <h3 className="text-sm font-bold text-red-900 mb-2">💰 Deducciones</h3>
+            <ul className="list-disc pl-5 text-sm text-gray-800 space-y-1">
+              <li>
+                <strong>Salud:</strong> Salario base × 4%
+              </li>
+              <li>
+                <strong>Pensión:</strong> Salario base × 4%
+              </li>
+            </ul>
+          </div>
+        </div>
       </section>
     </div>
   );
