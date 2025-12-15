@@ -15,7 +15,7 @@ export default async function DashboardHomePage() {
   // Cargar datos del usuario
   const { data: perfil } = await supabase
     .from("usuarios")
-    .select("id, nombre, email")
+    .select("id, nombre, email, tipo_descanso")
     .eq("id", user.id)
     .single();
 
@@ -34,22 +34,25 @@ export default async function DashboardHomePage() {
   // Cargar turnos del usuario del mes actual
   const { data: turnosData } = await supabase
     .from("turnos")
-    .select("fecha, horario_id, horarios(nombre, hora_inicio, hora_fin)")
+    .select("fecha, horario_id, horarios(nombre, hora_inicio, hora_fin, horas_trabajadas)")
     .eq("usuario_id", user.id)
     .gte("fecha", fechaInicio)
     .lte("fecha", fechaFin)
     .order("fecha", { ascending: true });
 
-  // Mapear turnos para formato correcto
-  const turnos = (turnosData || []).map((t: any) => ({
-    fecha: t.fecha,
-    horario_id: t.horario_id,
-    horarios: {
-      nombre: t.horarios?.nombre || "",
-      hora_inicio: t.horarios?.hora_inicio || "",
-      hora_fin: t.horarios?.hora_fin || "",
-    },
-  }));
+  // Mapear turnos para formato correcto (filtrar turnos con 0 horas)
+  const turnos = (turnosData || [])
+    .filter((t: any) => (t.horarios?.horas_trabajadas || 0) > 0)
+    .map((t: any) => ({
+      fecha: t.fecha,
+      horario_id: t.horario_id,
+      horarios: {
+        nombre: t.horarios?.nombre || "",
+        hora_inicio: t.horarios?.hora_inicio || "",
+        hora_fin: t.horarios?.hora_fin || "",
+        horas_trabajadas: t.horarios?.horas_trabajadas || 0,
+      },
+    }));
 
   // Cargar festivos del mes actual
   const { data: festivos } = await supabase
@@ -64,6 +67,7 @@ export default async function DashboardHomePage() {
       userName={perfil.nombre}
       turnos={turnos}
       festivos={festivos || []}
+      tipoDescanso={(perfil as any).tipo_descanso || null}
     />
   );
 }

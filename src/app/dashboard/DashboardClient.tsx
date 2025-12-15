@@ -9,6 +9,7 @@ type Turno = {
     nombre: string;
     hora_inicio: string;
     hora_fin: string;
+    horas_trabajadas: number;
   };
 };
 
@@ -21,6 +22,7 @@ type Props = {
   userName: string;
   turnos: Turno[];
   festivos: Festivo[];
+  tipoDescanso: string | null;
 };
 
 function getSaludo() {
@@ -48,7 +50,7 @@ function getNombreDia(dia: number) {
   return dias[dia];
 }
 
-export default function DashboardClient({ userName, turnos, festivos }: Props) {
+export default function DashboardClient({ userName, turnos, festivos, tipoDescanso }: Props) {
   const saludo = getSaludo();
   const now = new Date();
   const mesActual = now.getMonth();
@@ -94,11 +96,11 @@ export default function DashboardClient({ userName, turnos, festivos }: Props) {
   return (
     <div className="space-y-6">
       {/* Saludo */}
-      <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-lg shadow-lg p-6 text-white">
+      <div className="bg-gradient-to-r from-rose-500 to-rose-600 rounded-lg shadow-lg p-6 text-white">
         <h1 className="text-3xl font-bold mb-2">
           {saludo}, {userName}! 👋
         </h1>
-        <p className="text-red-100">
+        <p className="text-rose-100">
           Aquí está tu calendario del mes de {getNombreMes(mesActual)}
         </p>
       </div>
@@ -140,6 +142,9 @@ export default function DashboardClient({ userName, turnos, festivos }: Props) {
             const esHoy = dia === diaActual;
             const turno = turnosPorFecha.get(fechaStr);
             const descripcionFestivo = festivosDesc.get(fechaStr);
+            const esDescansoObligatorio = 
+              (tipoDescanso === "fijo_domingo" && esDomingo) ||
+              (tipoDescanso === "aleatorio" && !turno && esDomingo);
 
             let bgColor = "bg-gray-50 hover:bg-gray-100";
             let textColor = "text-gray-800";
@@ -149,17 +154,25 @@ export default function DashboardClient({ userName, turnos, festivos }: Props) {
               borderColor = "border-blue-500 border-2";
             }
 
+            // Festivos SIEMPRE morados (prioridad máxima)
             if (esFestivo) {
               bgColor = "bg-purple-100 hover:bg-purple-200";
               textColor = "text-purple-800";
-            } else if (esDomingo) {
+            }
+            // Descanso obligatorio en rojo
+            else if (esDescansoObligatorio) {
               bgColor = "bg-red-50 hover:bg-red-100";
               textColor = "text-red-700";
             }
-
-            if (turno) {
+            // Turno asignado en verde
+            else if (turno) {
               bgColor = "bg-green-100 hover:bg-green-200";
               textColor = "text-green-800";
+            }
+            // Domingo sin turno (pero no es descanso obligatorio)
+            else if (esDomingo) {
+              bgColor = "bg-red-50 hover:bg-red-100";
+              textColor = "text-red-700";
             }
 
             return (
@@ -193,7 +206,7 @@ export default function DashboardClient({ userName, turnos, festivos }: Props) {
                     </div>
                   )}
 
-                  {esDomingo && !esFestivo && !turno && (
+                  {esDescansoObligatorio && (
                     <div className="text-[10px] text-red-500 font-medium">
                       Descanso
                     </div>
@@ -230,11 +243,11 @@ export default function DashboardClient({ userName, turnos, festivos }: Props) {
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-red-50 border border-red-200 rounded"></div>
-            <span className="text-gray-600">Domingo</span>
+            <span className="text-gray-600">Descanso obligatorio</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-purple-100 border border-purple-200 rounded"></div>
-            <span className="text-gray-600">Festivo</span>
+            <span className="text-gray-600">Festivo (prioridad sobre turno)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 border-2 border-blue-500 rounded"></div>
