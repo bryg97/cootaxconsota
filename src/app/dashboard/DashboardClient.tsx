@@ -142,9 +142,17 @@ export default function DashboardClient({ userName, turnos, festivos, tipoDescan
             const esHoy = dia === diaActual;
             const turno = turnosPorFecha.get(fechaStr);
             const descripcionFestivo = festivosDesc.get(fechaStr);
+            
+            // Detectar si el turno es "Descanso obligatorio" por nombre o por 0 horas
+            const esTurnoDescanso = turno && (
+              turno.horarios.nombre.toLowerCase().includes("descanso") ||
+              turno.horarios.horas_trabajadas === 0
+            );
+            
             const esDescansoObligatorio = 
               (tipoDescanso === "fijo_domingo" && esDomingo) ||
-              (tipoDescanso === "aleatorio" && !turno && esDomingo);
+              (tipoDescanso === "aleatorio" && !turno && esDomingo) ||
+              esTurnoDescanso;
 
             let bgColor = "bg-gray-50 hover:bg-gray-100";
             let textColor = "text-gray-800";
@@ -159,13 +167,13 @@ export default function DashboardClient({ userName, turnos, festivos, tipoDescan
               bgColor = "bg-purple-100 hover:bg-purple-200";
               textColor = "text-purple-800";
             }
-            // Descanso obligatorio en rojo
+            // Descanso obligatorio en rojo (incluye turnos con nombre "descanso")
             else if (esDescansoObligatorio) {
               bgColor = "bg-red-50 hover:bg-red-100";
               textColor = "text-red-700";
             }
-            // Turno asignado en verde
-            else if (turno) {
+            // Turno asignado en verde (solo si no es descanso)
+            else if (turno && !esTurnoDescanso) {
               bgColor = "bg-green-100 hover:bg-green-200";
               textColor = "text-green-800";
             }
@@ -194,7 +202,8 @@ export default function DashboardClient({ userName, turnos, festivos, tipoDescan
                     {dia}
                   </div>
                   
-                  {turno && (
+                  {/* Mostrar turno solo si NO es descanso */}
+                  {turno && !esTurnoDescanso && (
                     <div className="text-[10px] leading-tight text-green-700 font-medium">
                       {turno.horarios.nombre}
                     </div>
@@ -206,7 +215,7 @@ export default function DashboardClient({ userName, turnos, festivos, tipoDescan
                     </div>
                   )}
 
-                  {esDescansoObligatorio && (
+                  {esDescansoObligatorio && !esFestivo && (
                     <div className="text-[10px] text-red-500 font-medium">
                       Descanso
                     </div>
