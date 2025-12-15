@@ -143,11 +143,14 @@ export default function DashboardClient({ userName, turnos, festivos, tipoDescan
             const turno = turnosPorFecha.get(fechaStr);
             const descripcionFestivo = festivosDesc.get(fechaStr);
             
-            // Detectar si el turno es "Descanso obligatorio" por nombre o por 0 horas
-            const esTurnoDescanso = turno && (
-              turno.horarios.nombre.toLowerCase().includes("descanso") ||
-              turno.horarios.horas_trabajadas === 0
-            );
+            // Detectar si el turno es "Descanso obligatorio" SOLO por nombre
+            const esTurnoDescanso = turno && 
+              turno.horarios.nombre.toLowerCase().includes("descanso");
+            
+            // Detectar turnos con 0 horas pero que NO son descanso obligatorio (días libres/ausencias)
+            const esDiaLibre = turno && 
+              turno.horarios.horas_trabajadas === 0 && 
+              !esTurnoDescanso;
             
             const esDescansoObligatorio = 
               (tipoDescanso === "fijo_domingo" && esDomingo) ||
@@ -167,13 +170,18 @@ export default function DashboardClient({ userName, turnos, festivos, tipoDescan
               bgColor = "bg-purple-100 hover:bg-purple-200";
               textColor = "text-purple-800";
             }
-            // Descanso obligatorio en rojo (incluye turnos con nombre "descanso")
+            // Descanso obligatorio en rojo (solo turnos con nombre "descanso")
             else if (esDescansoObligatorio) {
               bgColor = "bg-red-50 hover:bg-red-100";
               textColor = "text-red-700";
             }
-            // Turno asignado en verde (solo si no es descanso)
-            else if (turno && !esTurnoDescanso) {
+            // Día libre (turno con 0h pero no es descanso) en amarillo
+            else if (esDiaLibre) {
+              bgColor = "bg-yellow-50 hover:bg-yellow-100";
+              textColor = "text-yellow-800";
+            }
+            // Turno asignado en verde (solo si no es descanso ni día libre)
+            else if (turno && !esTurnoDescanso && !esDiaLibre) {
               bgColor = "bg-green-100 hover:bg-green-200";
               textColor = "text-green-800";
             }
@@ -202,9 +210,16 @@ export default function DashboardClient({ userName, turnos, festivos, tipoDescan
                     {dia}
                   </div>
                   
-                  {/* Mostrar turno solo si NO es descanso */}
-                  {turno && !esTurnoDescanso && (
+                  {/* Mostrar turno normal (con horas) */}
+                  {turno && !esTurnoDescanso && !esDiaLibre && (
                     <div className="text-[10px] leading-tight text-green-700 font-medium">
+                      {turno.horarios.nombre}
+                    </div>
+                  )}
+
+                  {/* Mostrar día libre (0 horas) */}
+                  {esDiaLibre && (
+                    <div className="text-[10px] leading-tight text-yellow-700 font-medium">
                       {turno.horarios.nombre}
                     </div>
                   )}
@@ -253,6 +268,10 @@ export default function DashboardClient({ userName, turnos, festivos, tipoDescan
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-red-50 border border-red-200 rounded"></div>
             <span className="text-gray-600">Descanso obligatorio</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-yellow-50 border border-yellow-200 rounded"></div>
+            <span className="text-gray-600">Día libre / Ausencia (0h)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-purple-100 border border-purple-200 rounded"></div>
