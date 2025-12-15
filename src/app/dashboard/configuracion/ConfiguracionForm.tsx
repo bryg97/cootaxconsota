@@ -1,7 +1,7 @@
 // src/app/dashboard/configuracion/ConfiguracionForm.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type Configuracion = {
@@ -31,35 +31,8 @@ export default function ConfiguracionForm({ initialConfig }: Props) {
   const [fondoSolidario, setFondoSolidario] = useState<number | "">(
     initialConfig?.fondo_solidario ?? ""
   );
-  const [salarioEjemplo, setSalarioEjemplo] = useState<number | "">(0);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-
-  // Fórmulas ejemplo (para mostrar, no se graban)
-  const valorHora = useMemo(() => {
-    if (!salarioEjemplo || !horasMensuales || horasMensuales === 0) return 0;
-    return Number(salarioEjemplo) / Number(horasMensuales);
-  }, [salarioEjemplo, horasMensuales]);
-
-  const valorDia = useMemo(() => {
-    if (!salarioEjemplo) return 0;
-    return Number(salarioEjemplo) / 30;
-  }, [salarioEjemplo]);
-
-  const recargos = useMemo(() => {
-    const vh = valorHora;
-    return {
-      recargo_nocturno_ordinario: vh * 0.35,
-      recargo_diurno_festivo: vh * 1.8,
-      recargo_nocturno_festivo: vh * 2.15,
-      recargo_diurno_domingo: vh * 0.8,
-      recargo_nocturno_domingo: vh * 1.15,
-      hora_extra_diurna: vh * 1.25,
-      hora_extra_nocturna: vh * 1.75,
-      hora_extra_diurna_dom_fest: vh * 2.0,
-      hora_extra_nocturna_dom_fest: vh * 2.5,
-    };
-  }, [valorHora]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,68 +173,106 @@ export default function ConfiguracionForm({ initialConfig }: Props) {
           </div>
         </div>
 
-        {/* Bloque para probar fórmulas con un salario base de ejemplo */}
+        {/* Fórmulas de cálculo */}
         <div className="mt-4 border-t pt-4">
-          <h2 className="text-lg font-semibold mb-2">
-            Simulación de fórmulas
+          <h2 className="text-lg font-semibold mb-3">
+            📊 Fórmulas de cálculo
           </h2>
 
-          <p className="text-sm text-gray-500 mb-2">
-            Ingresa un salario base de ejemplo para ver los valores
-            calculados por hora, día y recargos.
+          <p className="text-sm text-gray-600 mb-4">
+            Estas son las fórmulas utilizadas para calcular nómina según la legislación colombiana.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Salario base (ejemplo)
-              </label>
-              <input
-                type="number"
-                className="w-full border rounded-md px-3 py-2 text-sm"
-                value={salarioEjemplo}
-                onChange={(e) =>
-                  setSalarioEjemplo(
-                    e.target.value === "" ? "" : Number(e.target.value)
-                  )
-                }
-                min={0}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Valor hora
-              </label>
-              <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm">
-                {valorHora.toFixed(2)}
+          <div className="space-y-3">
+            {/* Fórmulas básicas */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-semibold text-sm text-blue-900 mb-3">Valores base</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between py-2 border-b border-blue-100">
+                  <span className="font-medium text-blue-800">Valor hora</span>
+                  <span className="text-blue-600 font-mono">Salario base ÷ Horas mensuales</span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="font-medium text-blue-800">Valor día</span>
+                  <span className="text-blue-600 font-mono">Salario base ÷ 30</span>
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Valor día (salario/30)
-              </label>
-              <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm">
-                {valorDia.toFixed(2)}
+            {/* Recargos */}
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <h3 className="font-semibold text-sm text-purple-900 mb-3">Recargos ordinarios</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between py-2 border-b border-purple-100">
+                  <span className="font-medium text-purple-800">Recargo nocturno ordinario</span>
+                  <span className="text-purple-600 font-mono">Valor hora × 35%</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-purple-100">
+                  <span className="font-medium text-purple-800">Recargo diurno festivo</span>
+                  <span className="text-purple-600 font-mono">Valor hora × 75%</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-purple-100">
+                  <span className="font-medium text-purple-800">Recargo nocturno festivo</span>
+                  <span className="text-purple-600 font-mono">Valor hora × 110%</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-purple-100">
+                  <span className="font-medium text-purple-800">Recargo diurno domingo</span>
+                  <span className="text-purple-600 font-mono">Valor hora × 75%</span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="font-medium text-purple-800">Recargo nocturno domingo</span>
+                  <span className="text-purple-600 font-mono">Valor hora × 110%</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Resumen de recargos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <div className="bg-gray-50 p-3 rounded-md">
-              <p>Recargo nocturno ordinario: {recargos.recargo_nocturno_ordinario.toFixed(2)}</p>
-              <p>Recargo diurno festivo: {recargos.recargo_diurno_festivo.toFixed(2)}</p>
-              <p>Recargo nocturno festivo: {recargos.recargo_nocturno_festivo.toFixed(2)}</p>
+            {/* Horas extras */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <h3 className="font-semibold text-sm text-green-900 mb-3">Horas extras</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between py-2 border-b border-green-100">
+                  <span className="font-medium text-green-800">Hora extra diurna</span>
+                  <span className="text-green-600 font-mono">Valor hora × 25%</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-green-100">
+                  <span className="font-medium text-green-800">Hora extra nocturna</span>
+                  <span className="text-green-600 font-mono">Valor hora × 75%</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-green-100">
+                  <span className="font-medium text-green-800">Hora extra diurna festivo/dominical</span>
+                  <span className="text-green-600 font-mono">Valor hora × 100%</span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="font-medium text-green-800">Hora extra nocturna festivo/dominical</span>
+                  <span className="text-green-600 font-mono">Valor hora × 150%</span>
+                </div>
+              </div>
             </div>
-            <div className="bg-gray-50 p-3 rounded-md">
-              <p>Recargo diurno domingo: {recargos.recargo_diurno_domingo.toFixed(2)}</p>
-              <p>Recargo nocturno domingo: {recargos.recargo_nocturno_domingo.toFixed(2)}</p>
-              <p>Hora extra diurna: {recargos.hora_extra_diurna.toFixed(2)}</p>
-              <p>Hora extra nocturna: {recargos.hora_extra_nocturna.toFixed(2)}</p>
-              <p>Hora extra diurna dom/fest: {recargos.hora_extra_diurna_dom_fest.toFixed(2)}</p>
-              <p>Hora extra nocturna dom/fest: {recargos.hora_extra_nocturna_dom_fest.toFixed(2)}</p>
+
+            {/* Deducciones */}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h3 className="font-semibold text-sm text-red-900 mb-3">Deducciones</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between py-2 border-b border-red-100">
+                  <span className="font-medium text-red-800">Salud</span>
+                  <span className="text-red-600 font-mono">(Salario + Extras + Recargos) × 4%</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-red-100">
+                  <span className="font-medium text-red-800">Pensión</span>
+                  <span className="text-red-600 font-mono">(Salario + Extras + Recargos) × 4%</span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="font-medium text-red-800">Fondo solidario</span>
+                  <span className="text-red-600 font-mono">Valor fijo mensual</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Nota importante */}
+            <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3">
+              <p className="text-xs text-yellow-800">
+                <strong>📌 Nota:</strong> El auxilio de transporte NO se incluye en la base de deducciones (salud y pensión).
+              </p>
             </div>
           </div>
         </div>
