@@ -173,7 +173,7 @@ export default function ConfiguracionForm({ initialConfig }: Props) {
           </div>
         </div>
 
-        {/* Fórmulas de cálculo */}
+        {/* Fórmulas de cálculo de nómina */}
         <div className="mt-4 border-t pt-4">
           <h2 className="text-lg font-semibold mb-3">
             📊 Fórmulas de cálculo
