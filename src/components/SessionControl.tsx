@@ -97,68 +97,44 @@ export default function SessionControl() {
         .order("created_at", { ascending: false });
 
       if (sesiones && sesiones.length > 1) {
-        setSesionesActivas(sesiones);
+        // Automáticamente cerrar todas las sesiones anteriores
+        await cerrarOtrasSesionesAutomatico(session);
+        
+        // Mostrar notificación temporal
         setMostrarAlerta(true);
+        
+        // Ocultar después de 5 segundos
+        setTimeout(() => {
+          setMostrarAlerta(false);
+        }, 5000);
       }
     } catch (error) {
       console.error("Error verificando sesiones:", error);
     }
   };
 
-  const cerrarOtrasSesiones = async () => {
-    setCerrando(true);
+  const cerrarOtrasSesionesAutomatico = async (session: any) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       // Eliminar todas las sesiones excepto la actual
       await supabase
         .from("sesiones_activas")
         .delete()
         .eq("usuario_id", session.user.id)
         .neq("session_token", session.access_token);
-
-      setMostrarAlerta(false);
-      setSesionesActivas([]);
     } catch (error) {
-      console.error("Error cerrando sesiones:", error);
-    } finally {
-      setCerrando(false);
-    }
-  };
-
-  const cerrarEstaYOtras = async () => {
-    setCerrando(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      // Eliminar TODAS las sesiones incluyendo la actual
-      await supabase
-        .from("sesiones_activas")
-        .delete()
-        .eq("usuario_id", session.user.id);
-
-      // Cerrar sesión actual
-      await supabase.auth.signOut();
-      
-      router.push("/login");
-    } catch (error) {
-      console.error("Error cerrando todas las sesiones:", error);
-    } finally {
-      setCerrando(false);
+      console.error("Error cerrando sesiones anteriores:", error);
     }
   };
 
   if (!mostrarAlerta) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 max-w-md">
-      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg shadow-lg">
+    <div className="fixed top-4 right-4 z-50 max-w-md animate-slide-in">
+      <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-lg shadow-lg">
         <div className="flex items-start">
           <div className="flex-shrink-0">
             <svg
-              className="h-6 w-6 text-yellow-400"
+              className="h-6 w-6 text-green-400"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -167,43 +143,33 @@ export default function SessionControl() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
           </div>
           <div className="ml-3 flex-1">
-            <h3 className="text-sm font-medium text-yellow-800">
-              ⚠️ Múltiples sesiones detectadas
+            <h3 className="text-sm font-medium text-green-800">
+              ✓ Sesión única activada
             </h3>
-            <div className="mt-2 text-sm text-yellow-700">
+            <div className="mt-2 text-sm text-green-700">
               <p>
-                Tienes <strong>{sesionesActivas.length}</strong> sesiones activas. 
-                Por seguridad, te recomendamos cerrar las sesiones anteriores.
+                Se detectó otra sesión activa y fue cerrada automáticamente.
+                Solo puedes tener una sesión activa por seguridad.
               </p>
             </div>
-            <div className="mt-4 flex flex-col gap-2">
-              <button
-                onClick={cerrarOtrasSesiones}
-                disabled={cerrando}
-                className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-semibold px-4 py-2 rounded-md transition-colors disabled:opacity-50"
-              >
-                {cerrando ? "Cerrando..." : "Cerrar las otras sesiones y continuar"}
-              </button>
-              <button
-                onClick={cerrarEstaYOtras}
-                disabled={cerrando}
-                className="w-full border border-yellow-600 text-yellow-700 hover:bg-yellow-100 text-sm font-semibold px-4 py-2 rounded-md transition-colors disabled:opacity-50"
-              >
-                Cerrar todas las sesiones (incluyendo esta)
-              </button>
-              <button
-                onClick={() => setMostrarAlerta(false)}
-                className="text-sm text-yellow-600 hover:text-yellow-800 underline"
-              >
-                Continuar de todos modos
-              </button>
-            </div>
           </div>
+          <button
+            onClick={() => setMostrarAlerta(false)}
+            className="ml-4 text-green-400 hover:text-green-600"
+          >
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
