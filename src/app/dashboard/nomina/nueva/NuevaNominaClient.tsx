@@ -228,6 +228,9 @@ export default function NuevaNominaClient({
 
   // Calcular nómina para cada usuario
   const nominaCalculada = useMemo(() => {
+    // Debug: mostrar fórmulas en consola
+    console.log("Fórmulas para cálculo:", formulas);
+    
     return usuarios.map((u) => {
       const salarioBase = u.salario_base || 0;
       const salarioPeriodo = tipo === "quincenal" ? salarioBase / 2 : salarioBase;
@@ -235,6 +238,11 @@ export default function NuevaNominaClient({
       const fondoPeriodo = tipo === "quincenal" ? fondoSolidario / 2 : fondoSolidario;
       const valorHora = salarioBase / (formulas.valor_hora_divisor_mensual || 240);
       const valorDia = salarioBase / (formulas.valor_dia_divisor || 30);
+      
+      // Debug: verificar valores base
+      if (isNaN(valorHora) || isNaN(valorDia)) {
+        console.error("Valores NaN para usuario:", u.nombre, { salarioBase, formulas, valorHora, valorDia });
+      }
 
       const turnosUsuario = turnosPorUsuario[u.id] || [];
       
@@ -496,15 +504,23 @@ export default function NuevaNominaClient({
   }, [usuarios, tipo, auxilioTransporte, fondoSolidario, formulas, config.horas_semanales, fechaInicio, fechaFin, festivosSet, turnosPorUsuario, horarioById, patrones]);
 
   const totales = useMemo(() => {
-    return nominaCalculada.reduce(
+    const result = nominaCalculada.reduce(
       (acc, n) => ({
-        devengado: acc.devengado + n.total_devengado,
-        deducciones: acc.deducciones + n.total_deducciones,
-        neto: acc.neto + n.neto_pagar,
+        devengado: acc.devengado + (n.total_devengado || 0),
+        deducciones: acc.deducciones + (n.total_deducciones || 0),
+        neto: acc.neto + (n.neto_pagar || 0),
       }),
       { devengado: 0, deducciones: 0, neto: 0 }
     );
-  }, [nominaCalculada]);
+    
+    // Validar que no haya NaN
+    if (isNaN(result.devengado) || isNaN(result.deducciones) || isNaN(result.neto)) {
+      console.error("Valores NaN detectados:", { result, formulas, config });
+      return { devengado: 0, deducciones: 0, neto: 0 };
+    }
+    
+    return result;
+  }, [nominaCalculada, formulas, config]);
 
   const procesarNomina = async () => {
     if (!periodo || !fechaInicio || !fechaFin) {
