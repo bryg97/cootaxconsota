@@ -211,8 +211,8 @@ export default function NuevaNominaClient({
       const salarioPeriodo = tipo === "quincenal" ? salarioBase / 2 : salarioBase;
       const auxilioPeriodo = tipo === "quincenal" ? auxilioTransporte / 2 : auxilioTransporte;
       const fondoPeriodo = tipo === "quincenal" ? fondoSolidario / 2 : fondoSolidario;
-      const valorHora = salarioBase / horasMensuales;
-      const valorDia = salarioBase / 30;
+      const valorHora = salarioBase / (formulas.valor_hora_divisor_mensual || 240);
+      const valorDia = salarioBase / (formulas.valor_dia_divisor || 30);
 
       const turnosUsuario = turnosPorUsuario[u.id] || [];
       
@@ -471,7 +471,7 @@ export default function NuevaNominaClient({
         turnos: turnosUsuario,
       };
     });
-  }, [usuarios, tipo, auxilioTransporte, fondoSolidario, horasMensuales, config.horas_semanales, fechaInicio, fechaFin, festivosSet, turnosPorUsuario, horarioById, patrones]);
+  }, [usuarios, tipo, auxilioTransporte, fondoSolidario, formulas, config.horas_semanales, fechaInicio, fechaFin, festivosSet, turnosPorUsuario, horarioById, patrones]);
 
   const totales = useMemo(() => {
     return nominaCalculada.reduce(
