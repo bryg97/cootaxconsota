@@ -274,22 +274,17 @@ export default function NuevaNominaClient({
           
           // Si trabajó en día de descanso obligatorio
           if (esDiaDescanso) {
-            // Horas normales → recargo festivo (porque es descanso obligatorio)
-            if (horasNormalesTurno > 0) {
-              horasRecargoFestivo += horasNormalesTurno;
-            }
-            // Horas extras → extras domingo (diurnas o nocturnas)
-            if (horasExtrasTurno > 0) {
-              horasExtras += horasExtrasTurno;
-              if (horasNocturnasTurno > 0) {
-                const proporcionNocturna = horasNocturnasTurno / horasTurno;
-                const extrasNocturnas = horasExtrasTurno * proporcionNocturna;
-                const extrasDiurnas = horasExtrasTurno - extrasNocturnas;
-                horasExtrasNocturnasDomingo += extrasNocturnas;
-                horasExtrasDiurnasDomingo += extrasDiurnas;
-              } else {
-                horasExtrasDiurnasDomingo += horasExtrasTurno;
-              }
+            // TODAS las horas son extras domingo (diurnas o nocturnas) porque trabajó descanso obligatorio
+            // No se aplica recargo normal + extra, TODO es extra
+            horasExtras += horasTurno;
+            if (horasNocturnasTurno > 0) {
+              const proporcionNocturna = horasNocturnasTurno / horasTurno;
+              const extrasNocturnas = horasTurno * proporcionNocturna;
+              const extrasDiurnas = horasTurno - extrasNocturnas;
+              horasExtrasNocturnasDomingo += extrasNocturnas;
+              horasExtrasDiurnasDomingo += extrasDiurnas;
+            } else {
+              horasExtrasDiurnasDomingo += horasTurno;
             }
           } 
           // Si es festivo

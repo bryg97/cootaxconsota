@@ -82,6 +82,8 @@ type Configuracion = {
   id: number;
   horas_mensuales?: number | null;
   horas_semanales?: number | null;
+  auxilio_transporte?: number | null;
+  fondo_solidario?: number | null;
 
   recargo_nocturno_inicio?: string | null;
   recargo_nocturno_fin?: string | null;
@@ -203,6 +205,8 @@ export default function ConfiguracionClient({
         .update({
           horas_mensuales: cfg.horas_mensuales ?? null,
           horas_semanales: cfg.horas_semanales ?? null,
+          auxilio_transporte: cfg.auxilio_transporte ?? null,
+          fondo_solidario: cfg.fondo_solidario ?? null,
 
           recargo_nocturno_inicio: cfg.recargo_nocturno_inicio ?? null,
           recargo_nocturno_fin: cfg.recargo_nocturno_fin ?? null,
@@ -357,6 +361,34 @@ export default function ConfiguracionClient({
                 setField("horas_mensuales", e.target.value === "" ? null : Number(e.target.value))
               }
               min={0}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1">Auxilio de transporte (mensual)</label>
+            <input
+              type="number"
+              className="w-full border rounded-md px-3 py-2 text-sm"
+              value={config?.auxilio_transporte ?? ""}
+              onChange={(e) =>
+                setField("auxilio_transporte", e.target.value === "" ? null : Number(e.target.value))
+              }
+              min={0}
+              placeholder="Ej: 200000"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1">Fondo solidario (mensual)</label>
+            <input
+              type="number"
+              className="w-full border rounded-md px-3 py-2 text-sm"
+              value={config?.fondo_solidario ?? ""}
+              onChange={(e) =>
+                setField("fondo_solidario", e.target.value === "" ? null : Number(e.target.value))
+              }
+              min={0}
+              placeholder="Ej: 50000"
             />
           </div>
         </div>
