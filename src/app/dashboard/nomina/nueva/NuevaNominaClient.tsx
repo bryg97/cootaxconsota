@@ -282,26 +282,19 @@ export default function NuevaNominaClient({
       // Procesar cada semana individualmente
       Object.entries(turnosPorSemana).forEach(([semanaKey, turnosSemana]) => {
         // Determinar día de descanso obligatorio
-        let diaDescansoObligatorio = 0; // 0 = domingo
+        let diaDescansoObligatorio = 0; // 0 = domingo por defecto
         
         if (u.tipo_descanso === "aleatorio") {
-          // Buscar en patrones semanales el día de descanso
-          // Por simplicidad, tomamos el primer patrón (puedes mejorar esto)
-          const patron = patrones[0];
-          if (patron) {
-            const diasPatron = [
-              patron.domingo,
-              patron.lunes,
-              patron.martes,
-              patron.miercoles,
-              patron.jueves,
-              patron.viernes,
-              patron.sabado,
-            ];
-            // Buscar el primer día sin turno asignado (null) como descanso
-            const indiceDescanso = diasPatron.findIndex((h) => h === null);
-            if (indiceDescanso !== -1) {
-              diaDescansoObligatorio = indiceDescanso;
+          // Para descanso aleatorio, detectar cuál día NO tiene turno asignado
+          const diasConTurno = new Set(
+            turnosSemana.map((t) => new Date(t.fecha + "T00:00:00").getDay())
+          );
+          
+          // Buscar el primer día de la semana (0-6) que NO tenga turno
+          for (let dia = 0; dia < 7; dia++) {
+            if (!diasConTurno.has(dia)) {
+              diaDescansoObligatorio = dia;
+              break;
             }
           }
         } else {
@@ -310,9 +303,8 @@ export default function NuevaNominaClient({
         }
 
         // Verificar si tuvo descanso en la semana
-        const fechasSemana = turnosSemana.map((t) => t.fecha);
         const diasConTurno = new Set(
-          fechasSemana.map((f) => new Date(f + "T00:00:00").getDay())
+          turnosSemana.map((t) => new Date(t.fecha + "T00:00:00").getDay())
         );
         
         const tuvoDescansoObligatorio = !diasConTurno.has(diaDescansoObligatorio);
