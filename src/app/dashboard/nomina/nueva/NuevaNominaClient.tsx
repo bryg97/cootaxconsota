@@ -237,11 +237,13 @@ export default function NuevaNominaClient({
         
         const tuvoDescansoObligatorio = !diasConTurno.has(diaDescansoObligatorio);
         
-        // Calcular horas de la semana
-        let horasSemana = 0;
-        let horasExtrasSemana = 0;
+        // Ordenar turnos por fecha (lunes a domingo)
+        const turnosOrdenados = [...turnosSemana].sort((a, b) => a.fecha.localeCompare(b.fecha));
         
-        turnosSemana.forEach((turno) => {
+        // Calcular horas acumuladas día por día
+        let horasAcumuladasSemana = 0;
+        
+        turnosOrdenados.forEach((turno) => {
           const horario = horarioById.get(turno.horario_id);
           if (!horario) return;
 
@@ -252,32 +254,42 @@ export default function NuevaNominaClient({
           
           const horasTurno = horario.horas_trabajadas || 0;
           const horasNocturnasTurno = calcularHorasNocturnas(horario.tramos || []);
-
-          // Si trabajó en día de descanso obligatorio, se trata como festivo
+          
+          // Calcular cuántas horas del turno son normales y cuántas extras
+          const horasNormalesDisponibles = Math.max(0, horasSemanales - horasAcumuladasSemana);
+          const horasNormalesTurno = Math.min(horasTurno, horasNormalesDisponibles);
+          const horasExtrasTurno = Math.max(0, horasTurno - horasNormalesTurno);
+          
+          // Acumular horas
+          horasAcumuladasSemana += horasTurno;
+          horasTrabajadas += horasTurno;
+          
+          // Si trabajó en día de descanso obligatorio, TODO es festivo
           if (esDiaDescanso) {
-            horasRecargoFestivo += horasTurno;
-            horasSemana += horasTurno;
-          } else if (esFestivo) {
-            horasRecargoFestivo += horasTurno;
-            horasSemana += horasTurno;
-          } else if (diaNumero === 0) { // Domingo pero no es día de descanso obligatorio
-            horasRecargoDominical += horasTurno;
-            horasSemana += horasTurno;
-          } else if (horasNocturnasTurno > 0) {
+            // Las horas normales son recargo festivo, las extras son extras festivo
+            horasRecargoFestivo += horasNormalesTurno;
+            horasExtras += horasExtrasTurno;
+          } 
+          // Si es festivo
+          else if (esFestivo) {
+            horasRecargoFestivo += horasNormalesTurno;
+            horasExtras += horasExtrasTurno;
+          } 
+          // Si es domingo (pero no es día de descanso obligatorio)
+          else if (diaNumero === 0) {
+            horasRecargoDominical += horasNormalesTurno;
+            horasExtras += horasExtrasTurno;
+          } 
+          // Si tiene horas nocturnas
+          else if (horasNocturnasTurno > 0) {
             horasRecargoNocturno += horasNocturnasTurno;
-            horasSemana += horasTurno;
-          } else {
-            horasSemana += horasTurno;
+            horasExtras += horasExtrasTurno;
+          } 
+          // Día normal
+          else {
+            horasExtras += horasExtrasTurno;
           }
         });
-
-        // Calcular extras de la semana
-        if (horasSemana > horasSemanales) {
-          horasExtrasSemana = horasSemana - horasSemanales;
-          horasExtras += horasExtrasSemana;
-        }
-
-        horasTrabajadas += horasSemana;
 
         // Si no tuvo descanso obligatorio, pagar un día adicional
         if (!tuvoDescansoObligatorio && turnosSemana.length >= 6) {
