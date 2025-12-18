@@ -264,30 +264,61 @@ export default function NuevaNominaClient({
           horasAcumuladasSemana += horasTurno;
           horasTrabajadas += horasTurno;
           
-          // Si trabajó en día de descanso obligatorio, TODO es festivo
+          // IMPORTANTE: Las horas normales van a recargos, las extras a horas extras
+          // NO se aplican ambos a la misma hora
+          
+          // Si trabajó en día de descanso obligatorio
           if (esDiaDescanso) {
-            // Las horas normales son recargo festivo, las extras son extras festivo
-            horasRecargoFestivo += horasNormalesTurno;
-            horasExtras += horasExtrasTurno;
+            // Horas normales → recargo festivo (porque es descanso obligatorio)
+            if (horasNormalesTurno > 0) {
+              horasRecargoFestivo += horasNormalesTurno;
+            }
+            // Horas extras → extras festivo/domingo
+            if (horasExtrasTurno > 0) {
+              horasExtras += horasExtrasTurno;
+            }
           } 
           // Si es festivo
           else if (esFestivo) {
-            horasRecargoFestivo += horasNormalesTurno;
-            horasExtras += horasExtrasTurno;
+            // Horas normales → recargo festivo
+            if (horasNormalesTurno > 0) {
+              horasRecargoFestivo += horasNormalesTurno;
+            }
+            // Horas extras → extras festivo
+            if (horasExtrasTurno > 0) {
+              horasExtras += horasExtrasTurno;
+            }
           } 
           // Si es domingo (pero no es día de descanso obligatorio)
           else if (diaNumero === 0) {
-            horasRecargoDominical += horasNormalesTurno;
-            horasExtras += horasExtrasTurno;
+            // Horas normales → recargo dominical
+            if (horasNormalesTurno > 0) {
+              horasRecargoDominical += horasNormalesTurno;
+            }
+            // Horas extras → extras dominicales
+            if (horasExtrasTurno > 0) {
+              horasExtras += horasExtrasTurno;
+            }
           } 
-          // Si tiene horas nocturnas
+          // Si tiene horas nocturnas (días lun-sab normales)
           else if (horasNocturnasTurno > 0) {
-            horasRecargoNocturno += horasNocturnasTurno;
-            horasExtras += horasExtrasTurno;
+            // Horas normales → recargo nocturno
+            if (horasNormalesTurno > 0) {
+              const proporcionNocturna = horasNocturnasTurno / horasTurno;
+              const horasNocturnasNormales = horasNormalesTurno * proporcionNocturna;
+              horasRecargoNocturno += horasNocturnasNormales;
+            }
+            // Horas extras → extras nocturnas
+            if (horasExtrasTurno > 0) {
+              horasExtras += horasExtrasTurno;
+            }
           } 
-          // Día normal
+          // Día normal diurno
           else {
-            horasExtras += horasExtrasTurno;
+            // Solo contamos las extras (las normales no tienen recargo)
+            if (horasExtrasTurno > 0) {
+              horasExtras += horasExtrasTurno;
+            }
           }
         });
 
