@@ -4,11 +4,30 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+type Formulas = {
+  valor_hora_divisor_mensual: number;
+  valor_dia_divisor: number;
+  recargo_nocturno_ordinario: number; // 35%
+  recargo_diurno_festivo: number; // 75%
+  recargo_nocturno_festivo: number; // 110%
+  recargo_dominical: number; // 75%
+  recargo_nocturno_dominical: number; // 110%
+  extra_diurna_ordinaria: number; // 25%
+  extra_nocturna_ordinaria: number; // 75%
+  extra_diurna_domingo: number; // 100%
+  extra_nocturna_domingo: number; // 150%
+  extra_diurna_festivo_domingo?: number;
+  extra_nocturna_festivo_domingo?: number;
+  recargo_diurno_domingo?: number;
+  recargo_nocturno_domingo?: number;
+};
+
 type Config = {
   horas_mensuales?: number;
   horas_semanales?: number;
   auxilio_transporte?: number;
   fondo_solidario?: number;
+  formulas?: Formulas;
 };
 
 type Usuario = {
@@ -88,6 +107,23 @@ export default function NuevaNominaClient({
   const horasMensuales = config.horas_mensuales || 240;
   const auxilioTransporte = config.auxilio_transporte || 0;
   const fondoSolidario = config.fondo_solidario || 0;
+
+  // Fórmulas por defecto (porcentajes)
+  const DEFAULT_FORMULAS: Formulas = {
+    valor_hora_divisor_mensual: 240,
+    valor_dia_divisor: 30,
+    recargo_nocturno_ordinario: 35,
+    recargo_diurno_festivo: 75,
+    recargo_nocturno_festivo: 110,
+    recargo_dominical: 75,
+    recargo_nocturno_dominical: 110,
+    extra_diurna_ordinaria: 25,
+    extra_nocturna_ordinaria: 75,
+    extra_diurna_domingo: 100,
+    extra_nocturna_domingo: 150,
+  };
+
+  const formulas = config.formulas || DEFAULT_FORMULAS;
 
   const festivosSet = useMemo(
     () => new Set(festivos.map((f) => f.fecha)),
@@ -361,16 +397,25 @@ export default function NuevaNominaClient({
         }
       });
 
-      // Calcular valores monetarios con multiplicadores específicos
-      const valorExtrasDiurnas = horasExtrasDiurnas * valorHora * 1.25;
-      const valorExtrasNocturnas = horasExtrasNocturnas * valorHora * 1.75;
-      const valorExtrasDiurnasDomingo = horasExtrasDiurnasDomingo * valorHora * 2.0;
-      const valorExtrasNocturnasDomingo = horasExtrasNocturnasDomingo * valorHora * 2.5;
+      // Calcular valores monetarios usando fórmulas de configuración (porcentajes)
+      const multExtraDiurna = 1 + (formulas.extra_diurna_ordinaria / 100);
+      const multExtraNocturna = 1 + (formulas.extra_nocturna_ordinaria / 100);
+      const multExtraDiurnaDomingo = 1 + (formulas.extra_diurna_domingo / 100);
+      const multExtraNocturnaDomingo = 1 + (formulas.extra_nocturna_domingo / 100);
+      
+      const valorExtrasDiurnas = horasExtrasDiurnas * valorHora * multExtraDiurna;
+      const valorExtrasNocturnas = horasExtrasNocturnas * valorHora * multExtraNocturna;
+      const valorExtrasDiurnasDomingo = horasExtrasDiurnasDomingo * valorHora * multExtraDiurnaDomingo;
+      const valorExtrasNocturnasDomingo = horasExtrasNocturnasDomingo * valorHora * multExtraNocturnaDomingo;
       const valorHorasExtras = valorExtrasDiurnas + valorExtrasNocturnas + valorExtrasDiurnasDomingo + valorExtrasNocturnasDomingo;
       
-      const valorRecargoNocturno = horasRecargoNocturno * valorHora * 0.35;
-      const valorRecargoFestivo = horasRecargoFestivo * valorHora * 0.75;
-      const valorRecargoDominical = horasRecargoDominical * valorHora * 0.75;
+      const multRecargoNocturno = formulas.recargo_nocturno_ordinario / 100;
+      const multRecargoFestivo = formulas.recargo_diurno_festivo / 100;
+      const multRecargoDominical = formulas.recargo_dominical / 100;
+      
+      const valorRecargoNocturno = horasRecargoNocturno * valorHora * multRecargoNocturno;
+      const valorRecargoFestivo = horasRecargoFestivo * valorHora * multRecargoFestivo;
+      const valorRecargoDominical = horasRecargoDominical * valorHora * multRecargoDominical;
       const valorDiasAdicionales = diasAdicionalesDescanso * valorDia;
 
       const totalRecargos =

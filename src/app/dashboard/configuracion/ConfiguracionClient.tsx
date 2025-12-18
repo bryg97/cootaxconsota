@@ -9,34 +9,34 @@ type Formulas = {
   valor_hora_divisor_mensual: number; // normalmente 240
   valor_dia_divisor: number; // normalmente 30
 
-  // recargos
-  recargo_nocturno_ordinario: number; // 0.35
-  recargo_diurno_festivo: number; // 1.80
-  recargo_nocturno_festivo: number; // 2.15
-  recargo_diurno_domingo: number; // 0.80
-  recargo_nocturno_domingo: number; // 1.15
+  // recargos (% sobre valor hora - ej: 35 = 35%)
+  recargo_nocturno_ordinario: number; // 35%
+  recargo_diurno_festivo: number; // 75%
+  recargo_nocturno_festivo: number; // 110%
+  recargo_diurno_domingo: number; // 75%
+  recargo_nocturno_domingo: number; // 110%
 
-  // extras
-  extra_diurna_ordinaria: number; // 1.25
-  extra_nocturna_ordinaria: number; // 1.75
-  extra_diurna_festivo_domingo: number; // 2.00
-  extra_nocturna_festivo_domingo: number; // 2.50
+  // extras (% adicional sobre valor hora - ej: 25 = +25%)
+  extra_diurna_ordinaria: number; // 25%
+  extra_nocturna_ordinaria: number; // 75%
+  extra_diurna_festivo_domingo: number; // 100%
+  extra_nocturna_festivo_domingo: number; // 150%
 };
 
 const DEFAULT_FORMULAS: Formulas = {
   valor_hora_divisor_mensual: 240,
   valor_dia_divisor: 30,
 
-  recargo_nocturno_ordinario: 0.35,
-  recargo_diurno_festivo: 1.8,
-  recargo_nocturno_festivo: 2.15,
-  recargo_diurno_domingo: 0.8,
-  recargo_nocturno_domingo: 1.15,
+  recargo_nocturno_ordinario: 35,
+  recargo_diurno_festivo: 75,
+  recargo_nocturno_festivo: 110,
+  recargo_diurno_domingo: 75,
+  recargo_nocturno_domingo: 110,
 
-  extra_diurna_ordinaria: 1.25,
-  extra_nocturna_ordinaria: 1.75,
-  extra_diurna_festivo_domingo: 2.0,
-  extra_nocturna_festivo_domingo: 2.5,
+  extra_diurna_ordinaria: 25,
+  extra_nocturna_ordinaria: 75,
+  extra_diurna_festivo_domingo: 100,
+  extra_nocturna_festivo_domingo: 150,
 };
 
 function toNum(v: any, fallback: number) {
@@ -148,15 +148,15 @@ export default function ConfiguracionClient({
   const recargosPreview = useMemo(() => {
     const vh = valorHora;
     return {
-      recargo_nocturno_ordinario: vh * formulas.recargo_nocturno_ordinario,
-      recargo_diurno_festivo: vh * formulas.recargo_diurno_festivo,
-      recargo_nocturno_festivo: vh * formulas.recargo_nocturno_festivo,
-      recargo_diurno_domingo: vh * formulas.recargo_diurno_domingo,
-      recargo_nocturno_domingo: vh * formulas.recargo_nocturno_domingo,
-      extra_diurna_ordinaria: vh * formulas.extra_diurna_ordinaria,
-      extra_nocturna_ordinaria: vh * formulas.extra_nocturna_ordinaria,
-      extra_diurna_festivo_domingo: vh * formulas.extra_diurna_festivo_domingo,
-      extra_nocturna_festivo_domingo: vh * formulas.extra_nocturna_festivo_domingo,
+      recargo_nocturno_ordinario: vh * (formulas.recargo_nocturno_ordinario / 100),
+      recargo_diurno_festivo: vh * (formulas.recargo_diurno_festivo / 100),
+      recargo_nocturno_festivo: vh * (formulas.recargo_nocturno_festivo / 100),
+      recargo_diurno_domingo: vh * (formulas.recargo_diurno_domingo / 100),
+      recargo_nocturno_domingo: vh * (formulas.recargo_nocturno_domingo / 100),
+      extra_diurna_ordinaria: vh * (1 + formulas.extra_diurna_ordinaria / 100),
+      extra_nocturna_ordinaria: vh * (1 + formulas.extra_nocturna_ordinaria / 100),
+      extra_diurna_festivo_domingo: vh * (1 + formulas.extra_diurna_festivo_domingo / 100),
+      extra_nocturna_festivo_domingo: vh * (1 + formulas.extra_nocturna_festivo_domingo / 100),
     };
   }, [valorHora, formulas]);
 
@@ -527,15 +527,15 @@ export default function ConfiguracionClient({
             hint="Salario base / este valor. Normalmente 30."
           />
 
-          <FormulaField label="Recargo nocturno ordinario" k="recargo_nocturno_ordinario" hint="Ej: 0.35 = 35%" />
-          <FormulaField label="Recargo diurno festivo" k="recargo_diurno_festivo" hint="Ej: 1.80" />
-          <FormulaField label="Recargo nocturno festivo" k="recargo_nocturno_festivo" hint="Ej: 2.15" />
-          <FormulaField label="Recargo diurno domingo" k="recargo_diurno_domingo" hint="Ej: 0.80" />
-          <FormulaField label="Recargo nocturno domingo" k="recargo_nocturno_domingo" hint="Ej: 1.15" />
-          <FormulaField label="Hora extra diurna ordinaria" k="extra_diurna_ordinaria" hint="Ej: 1.25" />
-          <FormulaField label="Hora extra nocturna ordinaria" k="extra_nocturna_ordinaria" hint="Ej: 1.75" />
-          <FormulaField label="Hora extra diurna (dom/fest)" k="extra_diurna_festivo_domingo" hint="Ej: 2.00" />
-          <FormulaField label="Hora extra nocturna (dom/fest)" k="extra_nocturna_festivo_domingo" hint="Ej: 2.50" />
+          <FormulaField label="Recargo nocturno ordinario (%)" k="recargo_nocturno_ordinario" hint="Ej: 35 = 35%" />
+          <FormulaField label="Recargo diurno festivo (%)" k="recargo_diurno_festivo" hint="Ej: 75 = 75%" />
+          <FormulaField label="Recargo nocturno festivo (%)" k="recargo_nocturno_festivo" hint="Ej: 110 = 110%" />
+          <FormulaField label="Recargo diurno domingo (%)" k="recargo_diurno_domingo" hint="Ej: 75 = 75%" />
+          <FormulaField label="Recargo nocturno domingo (%)" k="recargo_nocturno_domingo" hint="Ej: 110 = 110%" />
+          <FormulaField label="Hora extra diurna ordinaria (%)" k="extra_diurna_ordinaria" hint="Ej: 25 = +25%" />
+          <FormulaField label="Hora extra nocturna ordinaria (%)" k="extra_nocturna_ordinaria" hint="Ej: 75 = +75%" />
+          <FormulaField label="Hora extra diurna (dom/fest) (%)" k="extra_diurna_festivo_domingo" hint="Ej: 100 = +100%" />
+          <FormulaField label="Hora extra nocturna (dom/fest) (%)" k="extra_nocturna_festivo_domingo" hint="Ej: 150 = +150%" />
         </div>
 
         {/* Simulación */}

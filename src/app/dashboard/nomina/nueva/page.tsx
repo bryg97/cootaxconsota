@@ -33,7 +33,7 @@ export default async function NuevaNominaPage() {
   // Cargar configuración
   const { data: config } = await supabase
     .from("configuraciones")
-    .select("horas_mensuales, horas_semanales, auxilio_transporte, fondo_solidario")
+    .select("*")
     .order("id", { ascending: true })
     .limit(1)
     .maybeSingle();
