@@ -192,6 +192,10 @@ export default function NuevaNominaClient({
 
       let horasTrabajadas = 0;
       let horasExtras = 0;
+      let horasExtrasDiurnas = 0;
+      let horasExtrasNocturnas = 0;
+      let horasExtrasDiurnasDomingo = 0;
+      let horasExtrasNocturnasDomingo = 0;
       let horasRecargoNocturno = 0;
       let horasRecargoFestivo = 0;
       let horasRecargoDominical = 0;
@@ -273,9 +277,18 @@ export default function NuevaNominaClient({
             if (horasNormalesTurno > 0) {
               horasRecargoFestivo += horasNormalesTurno;
             }
-            // Horas extras → extras festivo/domingo
+            // Horas extras → extras domingo (diurnas o nocturnas)
             if (horasExtrasTurno > 0) {
               horasExtras += horasExtrasTurno;
+              if (horasNocturnasTurno > 0) {
+                const proporcionNocturna = horasNocturnasTurno / horasTurno;
+                const extrasNocturnas = horasExtrasTurno * proporcionNocturna;
+                const extrasDiurnas = horasExtrasTurno - extrasNocturnas;
+                horasExtrasNocturnasDomingo += extrasNocturnas;
+                horasExtrasDiurnasDomingo += extrasDiurnas;
+              } else {
+                horasExtrasDiurnasDomingo += horasExtrasTurno;
+              }
             }
           } 
           // Si es festivo
@@ -284,9 +297,18 @@ export default function NuevaNominaClient({
             if (horasNormalesTurno > 0) {
               horasRecargoFestivo += horasNormalesTurno;
             }
-            // Horas extras → extras festivo
+            // Horas extras → extras festivo/domingo
             if (horasExtrasTurno > 0) {
               horasExtras += horasExtrasTurno;
+              if (horasNocturnasTurno > 0) {
+                const proporcionNocturna = horasNocturnasTurno / horasTurno;
+                const extrasNocturnas = horasExtrasTurno * proporcionNocturna;
+                const extrasDiurnas = horasExtrasTurno - extrasNocturnas;
+                horasExtrasNocturnasDomingo += extrasNocturnas;
+                horasExtrasDiurnasDomingo += extrasDiurnas;
+              } else {
+                horasExtrasDiurnasDomingo += horasExtrasTurno;
+              }
             }
           } 
           // Si es domingo (pero no es día de descanso obligatorio)
@@ -298,6 +320,15 @@ export default function NuevaNominaClient({
             // Horas extras → extras dominicales
             if (horasExtrasTurno > 0) {
               horasExtras += horasExtrasTurno;
+              if (horasNocturnasTurno > 0) {
+                const proporcionNocturna = horasNocturnasTurno / horasTurno;
+                const extrasNocturnas = horasExtrasTurno * proporcionNocturna;
+                const extrasDiurnas = horasExtrasTurno - extrasNocturnas;
+                horasExtrasNocturnasDomingo += extrasNocturnas;
+                horasExtrasDiurnasDomingo += extrasDiurnas;
+              } else {
+                horasExtrasDiurnasDomingo += horasExtrasTurno;
+              }
             }
           } 
           // Si tiene horas nocturnas (días lun-sab normales)
@@ -308,9 +339,14 @@ export default function NuevaNominaClient({
               const horasNocturnasNormales = horasNormalesTurno * proporcionNocturna;
               horasRecargoNocturno += horasNocturnasNormales;
             }
-            // Horas extras → extras nocturnas
+            // Horas extras → extras nocturnas ordinarias
             if (horasExtrasTurno > 0) {
               horasExtras += horasExtrasTurno;
+              const proporcionNocturna = horasNocturnasTurno / horasTurno;
+              const extrasNocturnas = horasExtrasTurno * proporcionNocturna;
+              const extrasDiurnas = horasExtrasTurno - extrasNocturnas;
+              horasExtrasNocturnas += extrasNocturnas;
+              horasExtrasDiurnas += extrasDiurnas;
             }
           } 
           // Día normal diurno
@@ -318,6 +354,7 @@ export default function NuevaNominaClient({
             // Solo contamos las extras (las normales no tienen recargo)
             if (horasExtrasTurno > 0) {
               horasExtras += horasExtrasTurno;
+              horasExtrasDiurnas += horasExtrasTurno;
             }
           }
         });
@@ -328,8 +365,13 @@ export default function NuevaNominaClient({
         }
       });
 
-      // Calcular valores monetarios
-      const valorHorasExtras = horasExtras * valorHora * 1.25;
+      // Calcular valores monetarios con multiplicadores específicos
+      const valorExtrasDiurnas = horasExtrasDiurnas * valorHora * 1.25;
+      const valorExtrasNocturnas = horasExtrasNocturnas * valorHora * 1.75;
+      const valorExtrasDiurnasDomingo = horasExtrasDiurnasDomingo * valorHora * 2.0;
+      const valorExtrasNocturnasDomingo = horasExtrasNocturnasDomingo * valorHora * 2.5;
+      const valorHorasExtras = valorExtrasDiurnas + valorExtrasNocturnas + valorExtrasDiurnasDomingo + valorExtrasNocturnasDomingo;
+      
       const valorRecargoNocturno = horasRecargoNocturno * valorHora * 0.35;
       const valorRecargoFestivo = horasRecargoFestivo * valorHora * 0.75;
       const valorRecargoDominical = horasRecargoDominical * valorHora * 0.75;
@@ -559,6 +601,9 @@ export default function NuevaNominaClient({
                 <th className="px-2 py-2 text-right">Salario Base</th>
                 <th className="px-2 py-2 text-right">Auxilio</th>
                 <th className="px-2 py-2 text-right">H. Extras</th>
+                <th className="px-2 py-2 text-right">H. Noc.</th>
+                <th className="px-2 py-2 text-right">H. Fest.</th>
+                <th className="px-2 py-2 text-right">H. Dom.</th>
                 <th className="px-2 py-2 text-right">Recargos</th>
                 <th className="px-2 py-2 text-right">Días Adic.</th>
                 <th className="px-2 py-2 text-right">Total Dev.</th>
@@ -572,7 +617,18 @@ export default function NuevaNominaClient({
                   <td className="px-2 py-2 font-medium">{n.nombre}</td>
                   <td className="px-2 py-2 text-right">{formatCurrency(n.salario_base)}</td>
                   <td className="px-2 py-2 text-right">{formatCurrency(n.auxilio_transporte)}</td>
-                  <td className="px-2 py-2 text-right">{formatCurrency(n.valor_horas_extras)}</td>
+                  <td className="px-2 py-2 text-right" title={`${n.horas_extras.toFixed(2)}h extras`}>
+                    {formatCurrency(n.valor_horas_extras)}
+                  </td>
+                  <td className="px-2 py-2 text-right" title={`${n.horas_recargo_nocturno.toFixed(2)}h nocturnas`}>
+                    {n.horas_recargo_nocturno > 0 ? n.horas_recargo_nocturno.toFixed(1) + 'h' : '-'}
+                  </td>
+                  <td className="px-2 py-2 text-right" title={`${n.horas_recargo_festivo.toFixed(2)}h festivo`}>
+                    {n.horas_recargo_festivo > 0 ? n.horas_recargo_festivo.toFixed(1) + 'h' : '-'}
+                  </td>
+                  <td className="px-2 py-2 text-right" title={`${n.horas_recargo_dominical.toFixed(2)}h dominical`}>
+                    {n.horas_recargo_dominical > 0 ? n.horas_recargo_dominical.toFixed(1) + 'h' : '-'}
+                  </td>
                   <td className="px-2 py-2 text-right">{formatCurrency(n.total_recargos)}</td>
                   <td className="px-2 py-2 text-right">
                     {n.dias_adicionales_descanso > 0 ? (
