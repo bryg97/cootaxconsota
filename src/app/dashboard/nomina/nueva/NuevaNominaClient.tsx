@@ -123,7 +123,29 @@ export default function NuevaNominaClient({
     extra_nocturna_domingo: 150,
   };
 
-  const formulas = config.formulas || DEFAULT_FORMULAS;
+  // Normalizar fórmulas para asegurar valores válidos
+  const normalizeFormulas = (raw: any): Formulas => {
+    const f = raw ?? {};
+    const toNum = (v: any, fallback: number) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    return {
+      valor_hora_divisor_mensual: toNum(f.valor_hora_divisor_mensual, DEFAULT_FORMULAS.valor_hora_divisor_mensual),
+      valor_dia_divisor: toNum(f.valor_dia_divisor, DEFAULT_FORMULAS.valor_dia_divisor),
+      recargo_nocturno_ordinario: toNum(f.recargo_nocturno_ordinario, DEFAULT_FORMULAS.recargo_nocturno_ordinario),
+      recargo_diurno_festivo: toNum(f.recargo_diurno_festivo, DEFAULT_FORMULAS.recargo_diurno_festivo),
+      recargo_nocturno_festivo: toNum(f.recargo_nocturno_festivo, DEFAULT_FORMULAS.recargo_nocturno_festivo),
+      recargo_dominical: toNum(f.recargo_dominical || f.recargo_diurno_domingo, DEFAULT_FORMULAS.recargo_dominical),
+      recargo_nocturno_dominical: toNum(f.recargo_nocturno_dominical || f.recargo_nocturno_domingo, DEFAULT_FORMULAS.recargo_nocturno_dominical),
+      extra_diurna_ordinaria: toNum(f.extra_diurna_ordinaria, DEFAULT_FORMULAS.extra_diurna_ordinaria),
+      extra_nocturna_ordinaria: toNum(f.extra_nocturna_ordinaria, DEFAULT_FORMULAS.extra_nocturna_ordinaria),
+      extra_diurna_domingo: toNum(f.extra_diurna_domingo || f.extra_diurna_festivo_domingo, DEFAULT_FORMULAS.extra_diurna_domingo),
+      extra_nocturna_domingo: toNum(f.extra_nocturna_domingo || f.extra_nocturna_festivo_domingo, DEFAULT_FORMULAS.extra_nocturna_domingo),
+    };
+  };
+
+  const formulas = normalizeFormulas(config.formulas);
 
   const festivosSet = useMemo(
     () => new Set(festivos.map((f) => f.fecha)),
