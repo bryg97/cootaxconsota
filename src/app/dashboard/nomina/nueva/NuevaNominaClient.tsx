@@ -83,6 +83,7 @@ export default function NuevaNominaClient({
   
   const [procesando, setProcesando] = useState(false);
   const [msg, setMsg] = useState("");
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
 
   const horasMensuales = config.horas_mensuales || 240;
   const auxilioTransporte = config.auxilio_transporte || 0;
@@ -403,6 +404,14 @@ export default function NuevaNominaClient({
         horas_trabajadas: horasTrabajadas,
         horas_extras: horasExtras,
         valor_horas_extras: valorHorasExtras,
+        horas_extras_diurnas: horasExtrasDiurnas,
+        horas_extras_nocturnas: horasExtrasNocturnas,
+        horas_extras_diurnas_domingo: horasExtrasDiurnasDomingo,
+        horas_extras_nocturnas_domingo: horasExtrasNocturnasDomingo,
+        valor_extras_diurnas: valorExtrasDiurnas,
+        valor_extras_nocturnas: valorExtrasNocturnas,
+        valor_extras_diurnas_domingo: valorExtrasDiurnasDomingo,
+        valor_extras_nocturnas_domingo: valorExtrasNocturnasDomingo,
         horas_recargo_nocturno: horasRecargoNocturno,
         valor_recargo_nocturno: valorRecargoNocturno,
         horas_recargo_festivo: horasRecargoFestivo,
@@ -418,6 +427,8 @@ export default function NuevaNominaClient({
         deduccion_fondo_solidario: deduccionFondo,
         total_deducciones: totalDeducciones,
         neto_pagar: netoPagar,
+        // Guardar turnos para mostrar desglose
+        turnos: turnosUsuario,
       };
     });
   }, [usuarios, tipo, auxilioTransporte, fondoSolidario, horasMensuales, config.horas_semanales, fechaInicio, fechaFin, festivosSet, turnosPorUsuario, horarioById, patrones]);
@@ -613,42 +624,118 @@ export default function NuevaNominaClient({
             </thead>
             <tbody>
               {nominaCalculada.map((n) => (
-                <tr key={n.usuario_id} className="border-b hover:bg-gray-50">
-                  <td className="px-2 py-2 font-medium">{n.nombre}</td>
-                  <td className="px-2 py-2 text-right">{formatCurrency(n.salario_base)}</td>
-                  <td className="px-2 py-2 text-right">{formatCurrency(n.auxilio_transporte)}</td>
-                  <td className="px-2 py-2 text-right" title={`${n.horas_extras.toFixed(2)}h extras`}>
-                    {formatCurrency(n.valor_horas_extras)}
-                  </td>
-                  <td className="px-2 py-2 text-right" title={`${n.horas_recargo_nocturno.toFixed(2)}h nocturnas`}>
-                    {n.horas_recargo_nocturno > 0 ? n.horas_recargo_nocturno.toFixed(1) + 'h' : '-'}
-                  </td>
-                  <td className="px-2 py-2 text-right" title={`${n.horas_recargo_festivo.toFixed(2)}h festivo`}>
-                    {n.horas_recargo_festivo > 0 ? n.horas_recargo_festivo.toFixed(1) + 'h' : '-'}
-                  </td>
-                  <td className="px-2 py-2 text-right" title={`${n.horas_recargo_dominical.toFixed(2)}h dominical`}>
-                    {n.horas_recargo_dominical > 0 ? n.horas_recargo_dominical.toFixed(1) + 'h' : '-'}
-                  </td>
-                  <td className="px-2 py-2 text-right">{formatCurrency(n.total_recargos)}</td>
-                  <td className="px-2 py-2 text-right">
-                    {n.dias_adicionales_descanso > 0 ? (
-                      <span className="text-orange-600" title={`${n.dias_adicionales_descanso} días adicionales por descanso no tomado`}>
-                        {formatCurrency(n.valor_dias_adicionales)}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td className="px-2 py-2 text-right font-medium text-green-600">
-                    {formatCurrency(n.total_devengado)}
-                  </td>
-                  <td className="px-2 py-2 text-right text-red-600">
-                    {formatCurrency(n.total_deducciones)}
-                  </td>
-                  <td className="px-2 py-2 text-right font-bold text-blue-600">
-                    {formatCurrency(n.neto_pagar)}
-                  </td>
-                </tr>
+                <>
+                  <tr key={n.usuario_id} className="border-b hover:bg-gray-50">
+                    <td className="px-2 py-2 font-medium">
+                      <button
+                        onClick={() => setExpandedUser(expandedUser === n.usuario_id ? null : n.usuario_id)}
+                        className="text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        {expandedUser === n.usuario_id ? '▼' : '▶'} {n.nombre}
+                      </button>
+                    </td>
+                    <td className="px-2 py-2 text-right">{formatCurrency(n.salario_base)}</td>
+                    <td className="px-2 py-2 text-right">{formatCurrency(n.auxilio_transporte)}</td>
+                    <td className="px-2 py-2 text-right" title={`Diurnas: ${n.horas_extras_diurnas.toFixed(1)}h, Nocturnas: ${n.horas_extras_nocturnas.toFixed(1)}h, Dom. Diurnas: ${n.horas_extras_diurnas_domingo.toFixed(1)}h, Dom. Nocturnas: ${n.horas_extras_nocturnas_domingo.toFixed(1)}h`}>
+                      {n.horas_extras.toFixed(1)}h - {formatCurrency(n.valor_horas_extras)}
+                    </td>
+                    <td className="px-2 py-2 text-right" title={`${n.horas_recargo_nocturno.toFixed(2)}h nocturnas`}>
+                      {n.horas_recargo_nocturno > 0 ? n.horas_recargo_nocturno.toFixed(1) + 'h' : '-'}
+                    </td>
+                    <td className="px-2 py-2 text-right" title={`${n.horas_recargo_festivo.toFixed(2)}h festivo`}>
+                      {n.horas_recargo_festivo > 0 ? n.horas_recargo_festivo.toFixed(1) + 'h' : '-'}
+                    </td>
+                    <td className="px-2 py-2 text-right" title={`${n.horas_recargo_dominical.toFixed(2)}h dominical`}>
+                      {n.horas_recargo_dominical > 0 ? n.horas_recargo_dominical.toFixed(1) + 'h' : '-'}
+                    </td>
+                    <td className="px-2 py-2 text-right">{formatCurrency(n.total_recargos)}</td>
+                    <td className="px-2 py-2 text-right">
+                      {n.dias_adicionales_descanso > 0 ? (
+                        <span className="text-orange-600" title={`${n.dias_adicionales_descanso} días adicionales por descanso no tomado`}>
+                          {formatCurrency(n.valor_dias_adicionales)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-right font-medium text-green-600">
+                      {formatCurrency(n.total_devengado)}
+                    </td>
+                    <td className="px-2 py-2 text-right text-red-600">
+                      {formatCurrency(n.total_deducciones)}
+                    </td>
+                    <td className="px-2 py-2 text-right font-bold text-blue-600">
+                      {formatCurrency(n.neto_pagar)}
+                    </td>
+                  </tr>
+                  
+                  {/* Desglose de turnos expandible */}
+                  {expandedUser === n.usuario_id && n.turnos && (
+                    <tr>
+                      <td colSpan={12} className="px-4 py-3 bg-gray-50">
+                        <div className="text-xs">
+                          <h4 className="font-semibold mb-2">Desglose de turnos:</h4>
+                          <table className="min-w-full text-xs">
+                            <thead className="bg-gray-200">
+                              <tr>
+                                <th className="px-2 py-1 text-left">Fecha</th>
+                                <th className="px-2 py-1 text-left">Turno</th>
+                                <th className="px-2 py-1 text-right">Horas</th>
+                                <th className="px-2 py-1 text-left">Tipo</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {n.turnos.map((t: any, idx: number) => {
+                                const horario = horarioById.get(t.horario_id);
+                                const fecha = new Date(t.fecha + "T00:00:00");
+                                const esFestivo = festivosSet.has(t.fecha);
+                                const esDomingo = fecha.getDay() === 0;
+                                
+                                return (
+                                  <tr key={idx} className="border-b">
+                                    <td className="px-2 py-1">{t.fecha}</td>
+                                    <td className="px-2 py-1">{horario?.nombre || '-'}</td>
+                                    <td className="px-2 py-1 text-right">{horario?.horas_trabajadas || 0}h</td>
+                                    <td className="px-2 py-1">
+                                      {esFestivo ? '🎉 Festivo' : esDomingo ? '📅 Domingo' : '📝 Normal'}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                          
+                          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                            {n.horas_extras_diurnas > 0 && (
+                              <div className="bg-yellow-50 p-2 rounded">
+                                <div className="font-semibold">Extras Diurnas</div>
+                                <div>{n.horas_extras_diurnas.toFixed(2)}h = {formatCurrency(n.valor_extras_diurnas)}</div>
+                              </div>
+                            )}
+                            {n.horas_extras_nocturnas > 0 && (
+                              <div className="bg-indigo-50 p-2 rounded">
+                                <div className="font-semibold">Extras Nocturnas</div>
+                                <div>{n.horas_extras_nocturnas.toFixed(2)}h = {formatCurrency(n.valor_extras_nocturnas)}</div>
+                              </div>
+                            )}
+                            {n.horas_extras_diurnas_domingo > 0 && (
+                              <div className="bg-orange-50 p-2 rounded">
+                                <div className="font-semibold">Extras Dom. Diurnas</div>
+                                <div>{n.horas_extras_diurnas_domingo.toFixed(2)}h = {formatCurrency(n.valor_extras_diurnas_domingo)}</div>
+                              </div>
+                            )}
+                            {n.horas_extras_nocturnas_domingo > 0 && (
+                              <div className="bg-purple-50 p-2 rounded">
+                                <div className="font-semibold">Extras Dom. Nocturnas</div>
+                                <div>{n.horas_extras_nocturnas_domingo.toFixed(2)}h = {formatCurrency(n.valor_extras_nocturnas_domingo)}</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>
