@@ -707,7 +707,10 @@ export default function NuevaNominaClient({
                 <th className="px-2 py-2 text-right">Recargos</th>
                 <th className="px-2 py-2 text-right">Días Adic.</th>
                 <th className="px-2 py-2 text-right">Total Dev.</th>
-                <th className="px-2 py-2 text-right">Deducciones</th>
+                <th className="px-2 py-2 text-right">Salud (4%)</th>
+                <th className="px-2 py-2 text-right">Pensión (4%)</th>
+                <th className="px-2 py-2 text-right">Fondo Sol.</th>
+                <th className="px-2 py-2 text-right">Total Ded.</th>
                 <th className="px-2 py-2 text-right">Neto</th>
               </tr>
             </thead>
@@ -751,6 +754,15 @@ export default function NuevaNominaClient({
                       {formatCurrency(n.total_devengado)}
                     </td>
                     <td className="px-2 py-2 text-right text-red-600">
+                      {formatCurrency(n.deduccion_salud)}
+                    </td>
+                    <td className="px-2 py-2 text-right text-red-600">
+                      {formatCurrency(n.deduccion_pension)}
+                    </td>
+                    <td className="px-2 py-2 text-right text-red-600">
+                      {formatCurrency(n.deduccion_fondo_solidario)}
+                    </td>
+                    <td className="px-2 py-2 text-right font-medium text-red-600">
                       {formatCurrency(n.total_deducciones)}
                     </td>
                     <td className="px-2 py-2 text-right font-bold text-blue-600">
@@ -761,7 +773,7 @@ export default function NuevaNominaClient({
                   {/* Desglose de turnos expandible */}
                   {expandedUser === n.usuario_id && n.turnos && (
                     <tr>
-                      <td colSpan={12} className="px-4 py-3 bg-gray-50">
+                      <td colSpan={15} className="px-4 py-3 bg-gray-50">
                         <div className="text-xs">
                           <h4 className="font-semibold mb-2">Desglose de turnos:</h4>
                           <table className="min-w-full text-xs">
