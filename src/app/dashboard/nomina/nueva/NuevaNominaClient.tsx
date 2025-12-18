@@ -285,17 +285,14 @@ export default function NuevaNominaClient({
         let diaDescansoObligatorio = 0; // 0 = domingo por defecto
         
         if (u.tipo_descanso === "aleatorio") {
-          // Para descanso aleatorio, detectar cuál día NO tiene turno asignado
-          const diasConTurno = new Set(
-            turnosSemana.map((t) => new Date(t.fecha + "T00:00:00").getDay())
-          );
+          // Para descanso aleatorio, buscar el turno con horario "Descanso obligatorio"
+          const turnoDescanso = turnosSemana.find((t) => {
+            const horario = horarioById.get(t.horario_id);
+            return horario && horario.nombre.toLowerCase().includes("descanso obligatorio");
+          });
           
-          // Buscar el primer día de la semana (0-6) que NO tenga turno
-          for (let dia = 0; dia < 7; dia++) {
-            if (!diasConTurno.has(dia)) {
-              diaDescansoObligatorio = dia;
-              break;
-            }
+          if (turnoDescanso) {
+            diaDescansoObligatorio = new Date(turnoDescanso.fecha + "T00:00:00").getDay();
           }
         } else {
           // fijo_domingo
@@ -303,11 +300,20 @@ export default function NuevaNominaClient({
         }
 
         // Verificar si tuvo descanso en la semana
-        const diasConTurno = new Set(
-          turnosSemana.map((t) => new Date(t.fecha + "T00:00:00").getDay())
-        );
-        
-        const tuvoDescansoObligatorio = !diasConTurno.has(diaDescansoObligatorio);
+        // Para aleatorio: verificar si existe el turno "Descanso obligatorio"
+        let tuvoDescansoObligatorio = false;
+        if (u.tipo_descanso === "aleatorio") {
+          tuvoDescansoObligatorio = turnosSemana.some((t) => {
+            const horario = horarioById.get(t.horario_id);
+            return horario && horario.nombre.toLowerCase().includes("descanso obligatorio");
+          });
+        } else {
+          // Para fijo_domingo: verificar si NO trabajó el domingo
+          const diasConTurno = new Set(
+            turnosSemana.map((t) => new Date(t.fecha + "T00:00:00").getDay())
+          );
+          tuvoDescansoObligatorio = !diasConTurno.has(diaDescansoObligatorio);
+        }
         
         // Ordenar turnos por fecha (lunes a domingo)
         const turnosOrdenados = [...turnosSemana].sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -318,6 +324,10 @@ export default function NuevaNominaClient({
         turnosOrdenados.forEach((turno) => {
           const horario = horarioById.get(turno.horario_id);
           if (!horario) return;
+
+          // Si es un turno de "Descanso obligatorio", no lo procesamos como horas trabajadas
+          const esDescansoObligatorio = horario.nombre.toLowerCase().includes("descanso obligatorio");
+          if (esDescansoObligatorio) return;
 
           const fecha = turno.fecha;
           const esFestivo = festivosSet.has(fecha);
