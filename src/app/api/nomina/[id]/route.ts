@@ -39,17 +39,34 @@ export async function DELETE(
       );
     }
 
-    // Primero eliminar los detalles
-    const { error: detallesError } = await supabase
+    // Verificar si hay detalles para eliminar
+    const { data: detallesExistentes, error: checkError } = await supabase
       .from("nomina_detalles")
-      .delete()
+      .select("id")
       .eq("nomina_id", id);
 
-    if (detallesError) {
-      return NextResponse.json(
-        { message: "Error al eliminar detalles de la nómina", error: detallesError.message },
-        { status: 500 }
-      );
+    if (checkError) {
+      console.error("Error al verificar detalles:", checkError);
+    }
+
+    // Eliminar los detalles si existen
+    if (detallesExistentes && detallesExistentes.length > 0) {
+      const { error: detallesError } = await supabase
+        .from("nomina_detalles")
+        .delete()
+        .eq("nomina_id", id);
+
+      if (detallesError) {
+        console.error("Error al eliminar detalles:", detallesError);
+        return NextResponse.json(
+          { 
+            message: "Error al eliminar detalles de la nómina. Verifique los permisos en Supabase.", 
+            error: detallesError.message,
+            details: detallesError 
+          },
+          { status: 500 }
+        );
+      }
     }
 
     // Luego eliminar la nómina
@@ -59,8 +76,13 @@ export async function DELETE(
       .eq("id", id);
 
     if (deleteError) {
+      console.error("Error al eliminar nómina:", deleteError);
       return NextResponse.json(
-        { message: "Error al eliminar la nómina", error: deleteError.message },
+        { 
+          message: "Error al eliminar la nómina. Verifique los permisos en Supabase.", 
+          error: deleteError.message,
+          details: deleteError 
+        },
         { status: 500 }
       );
     }

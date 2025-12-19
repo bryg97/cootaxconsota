@@ -73,10 +73,14 @@ export default function NominaClient({
         router.refresh();
       } else {
         const error = await response.json();
-        alert(`Error: ${error.message || "No se pudo eliminar la nómina"}`);
+        console.error("Error al eliminar:", error);
+        const errorMsg = error.message || "No se pudo eliminar la nómina";
+        const errorDetails = error.error ? `\n\nDetalles: ${error.error}` : "";
+        alert(`Error: ${errorMsg}${errorDetails}\n\nSi el problema persiste, debe ejecutar el script fix-eliminar-nominas-rls.sql en Supabase.`);
       }
     } catch (error) {
-      alert("Error al eliminar la nómina");
+      console.error("Error catch:", error);
+      alert("Error al eliminar la nómina. Verifique la consola para más detalles.");
     } finally {
       setLoading(false);
     }
