@@ -357,8 +357,7 @@ export default function EditarNominaClient({
                         {detalle.usuario?.nombre || "N/A"}
                       </h3>
                       <p className="text-sm text-gray-600">
-                        {detalle.usuario?.numero_documento} -{" "}
-                        {detalle.usuario?.cargo}
+                        {detalle.usuario?.email}
                       </p>
                     </div>
                     <div className="flex gap-2">
