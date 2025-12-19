@@ -53,7 +53,34 @@ export default function NominaClient({
   initialNominas,
 }: Props) {
   const router = useRouter();
-  const [nominas] = useState<Nomina[]>(initialNominas);
+  const [nominas, setNominas] = useState<Nomina[]>(initialNominas);
+  const [loading, setLoading] = useState(false);
+
+  const handleDelete = async (nominaId: number) => {
+    if (!confirm("¿Está seguro de eliminar esta nómina? Esta acción no se puede deshacer.")) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/nomina/${nominaId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setNominas((prev) => prev.filter((n) => n.id !== nominaId));
+        alert("Nómina eliminada exitosamente");
+        router.refresh();
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.message || "No se pudo eliminar la nómina"}`);
+      }
+    } catch (error) {
+      alert("Error al eliminar la nómina");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -127,14 +154,34 @@ export default function NominaClient({
                       {formatCurrency(n.total_neto)}
                     </td>
                     <td className="px-3 py-2">
-                      <button
-                        onClick={() =>
-                          router.push(`/dashboard/nomina/${n.id}`)
-                        }
-                        className="text-blue-600 hover:underline text-xs"
-                      >
-                        Ver detalle
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() =>
+                            router.push(`/dashboard/nomina/${n.id}`)
+                          }
+                          className="text-blue-600 hover:underline text-xs"
+                        >
+                          Ver detalle
+                        </button>
+                        {isAdmin && n.estado !== "pagada" && (
+                          <>
+                            <button
+                              onClick={() =>
+                                router.push(`/dashboard/nomina/${n.id}/editar`)
+                              }
+                              className="text-green-600 hover:underline text-xs"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => handleDelete(n.id)}
+                              className="text-red-600 hover:underline text-xs"
+                            >
+                              Eliminar
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
