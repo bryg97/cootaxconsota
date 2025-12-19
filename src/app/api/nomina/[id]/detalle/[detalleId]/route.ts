@@ -21,7 +21,7 @@ export async function PATCH(
 
     // Actualizar el detalle
     const { data: detalle, error } = await supabase
-      .from("nomina_detalles")
+      .from("nominas_detalle")
       .update({
         salario_base: body.salario_base,
         horas_extras: body.horas_extras,
@@ -97,7 +97,7 @@ export async function DELETE(
 
     // Eliminar el detalle
     const { error } = await supabase
-      .from("nomina_detalles")
+      .from("nominas_detalle")
       .delete()
       .eq("id", detalleId)
       .eq("nomina_id", id);

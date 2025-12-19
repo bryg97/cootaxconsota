@@ -55,25 +55,25 @@ export default async function EditarNominaPage({
 
   // Obtener el detalle de empleados
   const { data: detalles, error: detallesError } = await supabase
-    .from("nomina_detalles")
+    .from("nominas_detalle")
     .select(`
       *,
-      empleado:empleados(
+      usuario:usuarios(
         id,
-        nombre_completo,
+        nombre,
         numero_documento,
         cargo
       )
     `)
     .eq("nomina_id", id)
-    .order("empleado_id");
+    .order("usuario_id");
 
-  // Obtener lista de empleados activos para agregar
+  // Obtener lista de usuarios activos para agregar
   const { data: empleadosActivos } = await supabase
-    .from("empleados")
-    .select("id, nombre_completo, numero_documento, cargo, salario_base")
+    .from("usuarios")
+    .select("id, nombre, numero_documento, cargo, salario_base")
     .eq("estado", "activo")
-    .order("nombre_completo");
+    .order("nombre");
 
   return (
     <EditarNominaClient

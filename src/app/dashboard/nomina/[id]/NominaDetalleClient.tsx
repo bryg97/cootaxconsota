@@ -21,22 +21,29 @@ type Nomina = {
 type Detalle = {
   id: number;
   nomina_id: number;
-  empleado_id: string;
+  usuario_id: string;
   salario_base: number;
+  auxilio_transporte: number;
+  horas_trabajadas: number;
   horas_extras: number;
-  bonificaciones: number;
-  otros_devengados: number;
+  valor_horas_extras: number;
+  horas_recargo_nocturno: number;
+  valor_recargo_nocturno: number;
+  horas_recargo_festivo: number;
+  valor_recargo_festivo: number;
+  horas_recargo_dominical: number;
+  valor_recargo_dominical: number;
+  total_recargos: number;
   total_devengado: number;
-  salud: number;
-  pension: number;
-  fondo_solidaridad: number;
-  retencion_fuente: number;
-  otras_deducciones: number;
+  deduccion_salud: number;
+  deduccion_pension: number;
+  deduccion_fondo_solidario: number;
   total_deducciones: number;
   neto_pagar: number;
-  empleado?: {
+  observaciones?: string;
+  usuario?: {
     id: string;
-    nombre_completo: string;
+    nombre: string;
     numero_documento: string;
     cargo: string;
   };
@@ -286,31 +293,31 @@ export default function NominaDetalleClient({
                 {detalles.map((detalle) => (
                   <tr key={detalle.id} className="border-b hover:bg-gray-50">
                     <td className="px-3 py-2 font-medium">
-                      {detalle.empleado?.nombre_completo || "N/A"}
+                      {detalle.usuario?.nombre || "N/A"}
                     </td>
                     <td className="px-3 py-2">
-                      {detalle.empleado?.numero_documento || "N/A"}
+                      {detalle.usuario?.numero_documento || "N/A"}
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      {detalle.empleado?.cargo || "N/A"}
+                      {detalle.usuario?.cargo || "N/A"}
                     </td>
                     <td className="px-3 py-2 text-right">
                       {formatCurrency(detalle.salario_base)}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {formatCurrency(detalle.horas_extras)}
+                      {formatCurrency(detalle.valor_horas_extras)}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {formatCurrency(detalle.bonificaciones)}
+                      {formatCurrency(detalle.total_recargos)}
                     </td>
                     <td className="px-3 py-2 text-right font-medium text-green-600">
                       {formatCurrency(detalle.total_devengado)}
                     </td>
                     <td className="px-3 py-2 text-right text-red-600">
-                      {formatCurrency(detalle.salud)}
+                      {formatCurrency(detalle.deduccion_salud)}
                     </td>
                     <td className="px-3 py-2 text-right text-red-600">
-                      {formatCurrency(detalle.pension)}
+                      {formatCurrency(detalle.deduccion_pension)}
                     </td>
                     <td className="px-3 py-2 text-right font-medium text-red-600">
                       {formatCurrency(detalle.total_deducciones)}

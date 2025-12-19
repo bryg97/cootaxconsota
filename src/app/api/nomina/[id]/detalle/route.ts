@@ -21,10 +21,10 @@ export async function POST(
 
     // Crear el nuevo detalle
     const { data: detalle, error } = await supabase
-      .from("nomina_detalles")
+      .from("nominas_detalle")
       .insert({
         nomina_id: id,
-        empleado_id: body.empleado_id,
+        usuario_id: body.empleado_id,
         salario_base: body.salario_base,
         horas_extras: body.horas_extras || 0,
         bonificaciones: body.bonificaciones || 0,
@@ -50,7 +50,7 @@ export async function POST(
 
     // Recalcular totales de la nómina
     const { data: detalles } = await supabase
-      .from("nomina_detalles")
+      .from("nominas_detalle")
       .select("total_devengado, total_deducciones, neto_pagar")
       .eq("nomina_id", id);
 

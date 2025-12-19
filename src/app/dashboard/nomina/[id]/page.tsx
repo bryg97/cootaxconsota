@@ -48,18 +48,18 @@ export default async function NominaDetallePage({
 
   // Obtener el detalle de empleados
   const { data: detalles, error: detallesError } = await supabase
-    .from("nomina_detalles")
+    .from("nominas_detalle")
     .select(`
       *,
-      empleado:empleados(
+      usuario:usuarios(
         id,
-        nombre_completo,
+        nombre,
         numero_documento,
         cargo
       )
     `)
     .eq("nomina_id", id)
-    .order("empleado_id");
+    .order("usuario_id");
 
   return (
     <NominaDetalleClient

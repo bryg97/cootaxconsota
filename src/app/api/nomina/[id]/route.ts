@@ -41,7 +41,7 @@ export async function DELETE(
 
     // Verificar si hay detalles para eliminar
     const { data: detallesExistentes, error: checkError } = await supabase
-      .from("nomina_detalles")
+      .from("nominas_detalle")
       .select("id")
       .eq("nomina_id", id);
 
@@ -52,7 +52,7 @@ export async function DELETE(
     // Eliminar los detalles si existen
     if (detallesExistentes && detallesExistentes.length > 0) {
       const { error: detallesError } = await supabase
-        .from("nomina_detalles")
+        .from("nominas_detalle")
         .delete()
         .eq("nomina_id", id);
 

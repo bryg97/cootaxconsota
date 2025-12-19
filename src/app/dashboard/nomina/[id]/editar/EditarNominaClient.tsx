@@ -18,22 +18,29 @@ type Nomina = {
 type Detalle = {
   id: number;
   nomina_id: number;
-  empleado_id: string;
+  usuario_id: string;
   salario_base: number;
+  auxilio_transporte: number;
+  horas_trabajadas: number;
   horas_extras: number;
-  bonificaciones: number;
-  otros_devengados: number;
+  valor_horas_extras: number;
+  horas_recargo_nocturno: number;
+  valor_recargo_nocturno: number;
+  horas_recargo_festivo: number;
+  valor_recargo_festivo: number;
+  horas_recargo_dominical: number;
+  valor_recargo_dominical: number;
+  total_recargos: number;
   total_devengado: number;
-  salud: number;
-  pension: number;
-  fondo_solidaridad: number;
-  retencion_fuente: number;
-  otras_deducciones: number;
+  deduccion_salud: number;
+  deduccion_pension: number;
+  deduccion_fondo_solidario: number;
   total_deducciones: number;
   neto_pagar: number;
-  empleado?: {
+  observaciones?: string;
+  usuario?: {
     id: string;
-    nombre_completo: string;
+    nombre: string;
     numero_documento: string;
     cargo: string;
   };
@@ -41,7 +48,7 @@ type Detalle = {
 
 type EmpleadoActivo = {
   id: string;
-  nombre_completo: string;
+  nombre: string;
   numero_documento: string;
   cargo: string;
   salario_base: number;
@@ -83,14 +90,19 @@ export default function EditarNominaClient({
     setEditForm({
       id: detalle.id,
       salario_base: detalle.salario_base,
+      auxilio_transporte: detalle.auxilio_transporte,
       horas_extras: detalle.horas_extras,
-      bonificaciones: detalle.bonificaciones,
-      otros_devengados: detalle.otros_devengados,
-      salud: detalle.salud,
-      pension: detalle.pension,
-      fondo_solidaridad: detalle.fondo_solidaridad,
-      retencion_fuente: detalle.retencion_fuente,
-      otras_deducciones: detalle.otras_deducciones,
+      valor_horas_extras: detalle.valor_horas_extras,
+      horas_recargo_nocturno: detalle.horas_recargo_nocturno,
+      valor_recargo_nocturno: detalle.valor_recargo_nocturno,
+      horas_recargo_festivo: detalle.horas_recargo_festivo,
+      valor_recargo_festivo: detalle.valor_recargo_festivo,
+      horas_recargo_dominical: detalle.horas_recargo_dominical,
+      valor_recargo_dominical: detalle.valor_recargo_dominical,
+      total_recargos: detalle.total_recargos,
+      deduccion_salud: detalle.deduccion_salud,
+      deduccion_pension: detalle.deduccion_pension,
+      deduccion_fondo_solidario: detalle.deduccion_fondo_solidario,
     });
   };
 
@@ -102,16 +114,14 @@ export default function EditarNominaClient({
   const calculateTotals = (form: Partial<Detalle>) => {
     const totalDevengado =
       (form.salario_base || 0) +
-      (form.horas_extras || 0) +
-      (form.bonificaciones || 0) +
-      (form.otros_devengados || 0);
+      (form.auxilio_transporte || 0) +
+      (form.valor_horas_extras || 0) +
+      (form.total_recargos || 0);
 
     const totalDeducciones =
-      (form.salud || 0) +
-      (form.pension || 0) +
-      (form.fondo_solidaridad || 0) +
-      (form.retencion_fuente || 0) +
-      (form.otras_deducciones || 0);
+      (form.deduccion_salud || 0) +
+      (form.deduccion_pension || 0) +
+      (form.deduccion_fondo_solidario || 0);
 
     const netoPagar = totalDevengado - totalDeducciones;
 
@@ -187,7 +197,7 @@ export default function EditarNominaClient({
     if (!empleado) return;
 
     // Verificar si ya está agregado
-    if (detalles.some((d) => d.empleado_id === selectedEmpleadoId)) {
+    if (detalles.some((d) => d.usuario_id === selectedEmpleadoId)) {
       alert("Este empleado ya está en la nómina");
       return;
     }
@@ -195,10 +205,10 @@ export default function EditarNominaClient({
     setLoading(true);
     try {
       // Calcular deducciones automáticas (4% salud, 4% pensión)
-      const salud = empleado.salario_base * 0.04;
-      const pension = empleado.salario_base * 0.04;
+      const deduccionSalud = empleado.salario_base * 0.04;
+      const deduccionPension = empleado.salario_base * 0.04;
       const totalDevengado = empleado.salario_base;
-      const totalDeducciones = salud + pension;
+      const totalDeducciones = deduccionSalud + deduccionPension;
       const netoPagar = totalDevengado - totalDeducciones;
 
       const response = await fetch(`/api/nomina/${nomina.id}/detalle`, {
@@ -207,15 +217,21 @@ export default function EditarNominaClient({
         body: JSON.stringify({
           empleado_id: selectedEmpleadoId,
           salario_base: empleado.salario_base,
+          auxilio_transporte: 0,
+          horas_trabajadas: 0,
           horas_extras: 0,
-          bonificaciones: 0,
-          otros_devengados: 0,
+          valor_horas_extras: 0,
+          horas_recargo_nocturno: 0,
+          valor_recargo_nocturno: 0,
+          horas_recargo_festivo: 0,
+          valor_recargo_festivo: 0,
+          horas_recargo_dominical: 0,
+          valor_recargo_dominical: 0,
+          total_recargos: 0,
           total_devengado: totalDevengado,
-          salud: salud,
-          pension: pension,
-          fondo_solidaridad: 0,
-          retencion_fuente: 0,
-          otras_deducciones: 0,
+          deduccion_salud: deduccionSalud,
+          deduccion_pension: deduccionPension,
+          deduccion_fondo_solidario: 0,
           total_deducciones: totalDeducciones,
           neto_pagar: netoPagar,
         }),
@@ -223,7 +239,7 @@ export default function EditarNominaClient({
 
       if (response.ok) {
         const newDetalle = await response.json();
-        setDetalles((prev) => [...prev, { ...newDetalle, empleado }]);
+        setDetalles((prev) => [...prev, { ...newDetalle, usuario: empleado }]);
         setSelectedEmpleadoId("");
         setShowAgregar(false);
         router.refresh();
@@ -239,7 +255,7 @@ export default function EditarNominaClient({
   };
 
   const empleadosDisponibles = empleadosActivos.filter(
-    (e) => !detalles.some((d) => d.empleado_id === e.id)
+    (e) => !detalles.some((d) => d.usuario_id === e.id)
   );
 
   return (
@@ -291,7 +307,7 @@ export default function EditarNominaClient({
                   <option value="">-- Seleccione --</option>
                   {empleadosDisponibles.map((emp) => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.nombre_completo} - {emp.numero_documento} - {emp.cargo} (
+                      {emp.nombre} - {emp.numero_documento} - {emp.cargo} (
                       {formatCurrency(emp.salario_base)})
                     </option>
                   ))}
@@ -341,11 +357,11 @@ export default function EditarNominaClient({
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h3 className="font-semibold">
-                        {detalle.empleado?.nombre_completo || "N/A"}
+                        {detalle.usuario?.nombre || "N/A"}
                       </h3>
                       <p className="text-sm text-gray-600">
-                        {detalle.empleado?.numero_documento} -{" "}
-                        {detalle.empleado?.cargo}
+                        {detalle.usuario?.numero_documento} -{" "}
+                        {detalle.usuario?.cargo}
                       </p>
                     </div>
                     <div className="flex gap-2">
