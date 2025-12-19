@@ -597,13 +597,21 @@ export default function NuevaNominaClient({
         neto_pagar: n.neto_pagar,
       }));
 
-      const { error: detalleError } = await supabase
+      console.log('Insertando detalles:', detalles.length, 'empleados');
+      console.log('Primer detalle:', detalles[0]);
+      
+      const { error: detalleError, data: detalleData } = await supabase
         .from("nominas_detalle")
-        .insert(detalles);
+        .insert(detalles)
+        .select();
 
-      if (detalleError) throw new Error(detalleError.message);
+      if (detalleError) {
+        console.error('Error insertando detalles:', detalleError);
+        throw new Error(`Error al guardar empleados: ${detalleError.message}`);
+      }
 
-      setMsg("✅ Borrador guardado correctamente");
+      console.log('Detalles insertados:', detalleData?.length);
+      setMsg(`✅ Borrador guardado correctamente (${detalleData?.length || 0} empleados)`);
       
       setTimeout(() => {
         router.push("/dashboard/nomina");
@@ -680,13 +688,21 @@ export default function NuevaNominaClient({
         neto_pagar: n.neto_pagar,
       }));
 
-      const { error: detalleError } = await supabase
+      console.log('Insertando detalles:', detalles.length, 'empleados');
+      console.log('Primer detalle:', detalles[0]);
+      
+      const { error: detalleError, data: detalleData } = await supabase
         .from("nominas_detalle")
-        .insert(detalles);
+        .insert(detalles)
+        .select();
 
-      if (detalleError) throw new Error(detalleError.message);
+      if (detalleError) {
+        console.error('Error insertando detalles:', detalleError);
+        throw new Error(`Error al guardar empleados: ${detalleError.message}`);
+      }
 
-      setMsg("✅ Nómina procesada correctamente");
+      console.log('Detalles insertados:', detalleData?.length);
+      setMsg(`✅ Nómina procesada correctamente (${detalleData?.length || 0} empleados)`);
       
       setTimeout(() => {
         router.push("/dashboard/nomina");
