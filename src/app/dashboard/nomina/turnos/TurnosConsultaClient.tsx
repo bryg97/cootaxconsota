@@ -95,6 +95,133 @@ function esDomingo(fecha: string): boolean {
   return new Date(year, month - 1, day).getDay() === 0;
 }
 
+// Días festivos de Colombia 2024-2025
+const FESTIVOS_COLOMBIA = [
+  // 2024
+  '2024-01-01', // Año Nuevo
+  '2024-01-08', // Reyes Magos
+  '2024-03-25', // San José
+  '2024-03-28', // Jueves Santo
+  '2024-03-29', // Viernes Santo
+  '2024-05-01', // Día del Trabajo
+  '2024-05-13', // Ascensión del Señor
+  '2024-06-03', // Corpus Christi
+  '2024-06-10', // Sagrado Corazón
+  '2024-07-01', // San Pedro y San Pablo
+  '2024-07-20', // Día de la Independencia
+  '2024-08-07', // Batalla de Boyacá
+  '2024-08-19', // Asunción de la Virgen
+  '2024-10-14', // Día de la Raza
+  '2024-11-04', // Todos los Santos
+  '2024-11-11', // Independencia de Cartagena
+  '2024-12-08', // Inmaculada Concepción
+  '2024-12-25', // Navidad
+  
+  // 2025
+  '2025-01-01', // Año Nuevo
+  '2025-01-06', // Reyes Magos
+  '2025-03-24', // San José
+  '2025-04-17', // Jueves Santo
+  '2025-04-18', // Viernes Santo
+  '2025-05-01', // Día del Trabajo
+  '2025-06-02', // Ascensión del Señor
+  '2025-06-23', // Corpus Christi
+  '2025-06-30', // Sagrado Corazón
+  '2025-07-01', // San Pedro y San Pablo (trasladado)
+  '2025-07-20', // Día de la Independencia
+  '2025-08-07', // Batalla de Boyacá
+  '2025-08-18', // Asunción de la Virgen
+  '2025-10-13', // Día de la Raza
+  '2025-11-03', // Todos los Santos
+  '2025-11-17', // Independencia de Cartagena
+  '2025-12-08', // Inmaculada Concepción
+  '2025-12-25', // Navidad
+];
+
+// Verificar si una fecha es festivo
+function esFestivo(fecha: string): boolean {
+  return FESTIVOS_COLOMBIA.includes(fecha);
+}
+
+// Calcular tipos de recargos detallados
+function calcularRecargosDetallados(fecha: string, tramos: any[]) {
+  if (!tramos || !Array.isArray(tramos)) {
+    return {
+      horasOrdinariasNocturnas: 0,
+      horasDominicalesDiurnas: 0,
+      horasDominicalesNocturnas: 0,
+      horasFestivasDiurnas: 0,
+      horasFestivasNocturnas: 0,
+    };
+  }
+
+  const isDomingo = esDomingo(fecha);
+  const isFestivo = esFestivo(fecha);
+  
+  let horasOrdinariasNocturnas = 0;
+  let horasDominicalesDiurnas = 0;
+  let horasDominicalesNocturnas = 0;
+  let horasFestivasDiurnas = 0;
+  let horasFestivasNocturnas = 0;
+
+  tramos.forEach((tramo) => {
+    const inicio = tramo.inicio || "";
+    const fin = tramo.fin || "";
+    
+    const [hIni, mIni] = inicio.split(":").map(Number);
+    const [hFin, mFin] = fin.split(":").map(Number);
+    
+    if (isNaN(hIni) || isNaN(mIni) || isNaN(hFin) || isNaN(mFin)) return;
+    
+    const minIni = hIni * 60 + mIni;
+    let minFin = hFin * 60 + mFin;
+    
+    // Si cruza medianoche
+    if (minFin < minIni) minFin += 24 * 60;
+    
+    // Constantes de tiempo
+    const NOCHE_INICIO = 22 * 60; // 22:00 = 1320 min
+    const NOCHE_FIN = 6 * 60; // 06:00 = 360 min
+    const DIA_FIN = 22 * 60; // 22:00
+    
+    // Calcular horas en rango nocturno (22:00-06:00)
+    let horasNocturnas = 0;
+    if (minIni >= NOCHE_INICIO || minFin <= NOCHE_FIN) {
+      // Todo el turno está en horario nocturno
+      horasNocturnas = (minFin - minIni) / 60;
+    } else if (minIni < NOCHE_INICIO && minFin > NOCHE_INICIO) {
+      // Cruza el inicio de la noche (22:00)
+      horasNocturnas = (minFin - NOCHE_INICIO) / 60;
+    } else if (minIni < NOCHE_FIN && minFin >= NOCHE_FIN) {
+      // Cruza el fin de la noche (06:00)
+      horasNocturnas = (NOCHE_FIN - minIni) / 60;
+    }
+    
+    // Calcular horas en rango diurno (06:00-22:00)
+    let horasDiurnas = ((minFin - minIni) / 60) - horasNocturnas;
+    
+    // Clasificar según el tipo de día
+    if (isDomingo) {
+      horasDominicalesDiurnas += horasDiurnas;
+      horasDominicalesNocturnas += horasNocturnas;
+    } else if (isFestivo) {
+      horasFestivasDiurnas += horasDiurnas;
+      horasFestivasNocturnas += horasNocturnas;
+    } else {
+      // Día ordinario, solo contar nocturnas como recargo
+      horasOrdinariasNocturnas += horasNocturnas;
+    }
+  });
+
+  return {
+    horasOrdinariasNocturnas,
+    horasDominicalesDiurnas,
+    horasDominicalesNocturnas,
+    horasFestivasDiurnas,
+    horasFestivasNocturnas,
+  };
+}
+
 export default function TurnosConsultaClient({
   isAdmin,
   usuarios,
@@ -339,50 +466,89 @@ export default function TurnosConsultaClient({
                   {isExpanded && (
                     <div className="p-4 space-y-2">
                       {turnosOrdenados.map((turno) => {
-                        const horasNocturnas = calcularHorasNocturnas(turno.horario?.tramos || []);
+                        const recargos = calcularRecargosDetallados(
+                          turno.fecha, 
+                          turno.horario?.tramos || []
+                        );
                         const isDomingo = esDomingo(turno.fecha);
-                        const tieneRecargos = horasNocturnas > 0 || isDomingo;
+                        const isFestivo = esFestivo(turno.fecha);
+                        const tieneRecargos = 
+                          recargos.horasOrdinariasNocturnas > 0 ||
+                          recargos.horasDominicalesDiurnas > 0 ||
+                          recargos.horasDominicalesNocturnas > 0 ||
+                          recargos.horasFestivasDiurnas > 0 ||
+                          recargos.horasFestivasNocturnas > 0;
                         
                         return (
                           <div
                             key={turno.id}
-                            className={`border rounded-lg p-3 ${tieneRecargos ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}
+                            className={`border rounded-lg p-3 ${
+                              isFestivo ? 'bg-red-50 border-red-200' :
+                              isDomingo ? 'bg-purple-50 border-purple-200' :
+                              tieneRecargos ? 'bg-yellow-50 border-yellow-200' : 
+                              'bg-white'
+                            }`}
                           >
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="font-semibold text-gray-900">
                                     {formatDate(turno.fecha)}
                                   </span>
-                                  {isDomingo && (
+                                  {isFestivo && (
+                                    <span className="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                                      🎉 Festivo
+                                    </span>
+                                  )}
+                                  {isDomingo && !isFestivo && (
                                     <span className="bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded-full font-medium">
-                                      Domingo
+                                      📅 Domingo
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-gray-600 mb-2">
                                   {turno.horario?.nombre || "N/A"}
                                 </div>
-                              </div>
-                              
-                              <div className="text-right">
-                                <div className="font-bold text-lg text-gray-900">
-                                  {turno.horario?.horas_trabajadas || 0}h
-                                </div>
+                                
+                                {/* Detalle de recargos */}
                                 {tieneRecargos && (
-                                  <div className="flex flex-col gap-1 mt-1">
-                                    {horasNocturnas > 0 && (
-                                      <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
-                                        🌙 {horasNocturnas.toFixed(1)}h nocturnas
-                                      </span>
+                                  <div className="space-y-1">
+                                    {recargos.horasOrdinariasNocturnas > 0 && (
+                                      <div className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded inline-block mr-1 mb-1">
+                                        🌙 {recargos.horasOrdinariasNocturnas.toFixed(1)}h nocturnas
+                                      </div>
                                     )}
-                                    {isDomingo && (
-                                      <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">
-                                        📅 Dominical
-                                      </span>
+                                    {recargos.horasDominicalesDiurnas > 0 && (
+                                      <div className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded inline-block mr-1 mb-1">
+                                        ☀️ {recargos.horasDominicalesDiurnas.toFixed(1)}h dominicales diurnas
+                                      </div>
+                                    )}
+                                    {recargos.horasDominicalesNocturnas > 0 && (
+                                      <div className="text-xs bg-purple-200 text-purple-900 px-2 py-1 rounded inline-block mr-1 mb-1">
+                                        🌙 {recargos.horasDominicalesNocturnas.toFixed(1)}h dominicales nocturnas
+                                      </div>
+                                    )}
+                                    {recargos.horasFestivasDiurnas > 0 && (
+                                      <div className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded inline-block mr-1 mb-1">
+                                        ☀️ {recargos.horasFestivasDiurnas.toFixed(1)}h festivas diurnas
+                                      </div>
+                                    )}
+                                    {recargos.horasFestivasNocturnas > 0 && (
+                                      <div className="text-xs bg-red-200 text-red-900 px-2 py-1 rounded inline-block mr-1 mb-1">
+                                        🌙 {recargos.horasFestivasNocturnas.toFixed(1)}h festivas nocturnas
+                                      </div>
                                     )}
                                   </div>
                                 )}
+                              </div>
+                              
+                              <div className="text-right ml-4">
+                                <div className="font-bold text-lg text-gray-900">
+                                  {turno.horario?.horas_trabajadas || 0}h
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Total
+                                </div>
                               </div>
                             </div>
                           </div>
