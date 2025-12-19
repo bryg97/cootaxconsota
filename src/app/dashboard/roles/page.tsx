@@ -30,7 +30,7 @@ export default async function RolesPage() {
   // Traer roles
   const { data: roles, error } = await supabase
     .from("roles")
-    .select("id, nombre, permisos")
+    .select("id, nombre, permisos, permisos_detallados")
     .order("id", { ascending: true });
 
   if (error) {

@@ -4,10 +4,17 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+type PermisoDetallado = {
+  modulo: string;
+  leer: boolean;
+  escribir: boolean;
+};
+
 type Rol = {
   id: number;
   nombre: string;
   permisos: string[] | null;
+  permisos_detallados?: PermisoDetallado[] | null;
 };
 
 const MODULOS_DISPONIBLES = [
@@ -24,30 +31,38 @@ interface Props {
 }
 
 export default function RolesTable({ initialRoles }: Props) {
-  const [roles, setRoles] = useState<Rol[]>(initialRoles);
+  const [roles, setRoles] = useState<Rol[]>(initialRoles.map(r => ({
+    ...r,
+    permisos_detallados: r.permisos_detallados || MODULOS_DISPONIBLES.map(m => ({
+      modulo: m.id,
+      leer: r.permisos?.includes(m.id) ?? false,
+      escribir: r.permisos?.includes(m.id) ?? false,
+    }))
+  })));
   const [loadingId, setLoadingId] = useState<number | "nuevo" | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
   const [nuevoNombre, setNuevoNombre] = useState("");
-  const [nuevoPermisos, setNuevoPermisos] = useState<string[]>([]);
+  const [nuevoPermisos, setNuevoPermisos] = useState<PermisoDetallado[]>(
+    MODULOS_DISPONIBLES.map(m => ({ modulo: m.id, leer: false, escribir: false }))
+  );
 
-  const togglePermisoEnNuevo = (permisoId: string) => {
+  const togglePermisoEnNuevo = (moduloId: string, tipo: 'leer' | 'escribir') => {
     setNuevoPermisos((prev) =>
-      prev.includes(permisoId)
-        ? prev.filter((p) => p !== permisoId)
-        : [...prev, permisoId]
+      prev.map(p => 
+        p.modulo === moduloId ? { ...p, [tipo]: !p[tipo] } : p
+      )
     );
   };
 
-  const togglePermisoEnRol = (rolId: number, permisoId: string) => {
+  const togglePermisoEnRol = (rolId: number, moduloId: string, tipo: 'leer' | 'escribir') => {
     setRoles((prev) =>
       prev.map((r) => {
         if (r.id !== rolId) return r;
-        const permisosActuales = r.permisos ?? [];
-        const nuevos = permisosActuales.includes(permisoId)
-          ? permisosActuales.filter((p) => p !== permisoId)
-          : [...permisosActuales, permisoId];
-        return { ...r, permisos: nuevos };
+        const permisosActualizados = (r.permisos_detallados || []).map(p =>
+          p.modulo === moduloId ? { ...p, [tipo]: !p[tipo] } : p
+        );
+        return { ...r, permisos_detallados: permisosActualizados };
       })
     );
   };
@@ -63,13 +78,19 @@ export default function RolesTable({ initialRoles }: Props) {
 
     setLoadingId("nuevo");
 
+    // Generar permisos simples para compatibilidad
+    const permisosSimples = nuevoPermisos
+      .filter(p => p.leer || p.escribir)
+      .map(p => p.modulo);
+
     const { data, error } = await supabase
       .from("roles")
       .insert({
         nombre: nuevoNombre.trim(),
-        permisos: nuevoPermisos,
+        permisos: permisosSimples,
+        permisos_detallados: nuevoPermisos,
       })
-      .select("id, nombre, permisos")
+      .select("id, nombre, permisos, permisos_detallados")
       .single();
 
     setLoadingId(null);
@@ -81,18 +102,24 @@ export default function RolesTable({ initialRoles }: Props) {
 
     setRoles((prev) => [...prev, data as Rol]);
     setNuevoNombre("");
-    setNuevoPermisos([]);
+    setNuevoPermisos(MODULOS_DISPONIBLES.map(m => ({ modulo: m.id, leer: false, escribir: false })));
   };
 
   const handleGuardarRol = async (rol: Rol) => {
     setErrorMsg("");
     setLoadingId(rol.id);
 
+    // Generar permisos simples para compatibilidad
+    const permisosSimples = (rol.permisos_detallados || [])
+      .filter(p => p.leer || p.escribir)
+      .map(p => p.modulo);
+
     const { error } = await supabase
       .from("roles")
       .update({
         nombre: rol.nombre,
-        permisos: rol.permisos ?? [],
+        permisos: permisosSimples,
+        permisos_detallados: rol.permisos_detallados,
       })
       .eq("id", rol.id);
 
@@ -165,23 +192,34 @@ export default function RolesTable({ initialRoles }: Props) {
           </div>
 
           <div>
-            <p className="block text-xs font-medium mb-1">
-              Módulos permitidos
+            <p className="block text-xs font-medium mb-2">
+              Permisos por módulo
             </p>
-            <div className="flex flex-wrap gap-2">
-              {MODULOS_DISPONIBLES.map((mod) => (
-                <label
-                  key={mod.id}
-                  className="inline-flex items-center gap-1 text-xs"
-                >
-                  <input
-                    type="checkbox"
-                    checked={nuevoPermisos.includes(mod.id)}
-                    onChange={() => togglePermisoEnNuevo(mod.id)}
-                  />
-                  <span>{mod.label}</span>
-                </label>
-              ))}
+            <div className="space-y-2">
+              {MODULOS_DISPONIBLES.map((mod) => {
+                const permiso = nuevoPermisos.find(p => p.modulo === mod.id);
+                return (
+                  <div key={mod.id} className="flex items-center gap-4 bg-gray-50 p-2 rounded">
+                    <span className="text-xs font-medium w-28">{mod.label}</span>
+                    <label className="inline-flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={permiso?.leer ?? false}
+                        onChange={() => togglePermisoEnNuevo(mod.id, 'leer')}
+                      />
+                      <span>👁️ Ver</span>
+                    </label>
+                    <label className="inline-flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={permiso?.escribir ?? false}
+                        onChange={() => togglePermisoEnNuevo(mod.id, 'escribir')}
+                      />
+                      <span>✏️ Editar</span>
+                    </label>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -231,22 +269,31 @@ export default function RolesTable({ initialRoles }: Props) {
                         />
                       </td>
                       <td className="px-3 py-2">
-                        <div className="flex flex-wrap gap-1">
-                          {MODULOS_DISPONIBLES.map((mod) => (
-                            <label
-                              key={mod.id}
-                              className="inline-flex items-center gap-1 bg-gray-100 rounded px-2 py-1"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={permisos.includes(mod.id)}
-                                onChange={() =>
-                                  togglePermisoEnRol(rol.id, mod.id)
-                                }
-                              />
-                              <span>{mod.label}</span>
-                            </label>
-                          ))}
+                        <div className="space-y-1">
+                          {MODULOS_DISPONIBLES.map((mod) => {
+                            const permiso = (rol.permisos_detallados || []).find(p => p.modulo === mod.id);
+                            return (
+                              <div key={mod.id} className="flex items-center gap-2 bg-gray-50 p-1 rounded text-xs">
+                                <span className="w-20 font-medium">{mod.label}</span>
+                                <label className="inline-flex items-center gap-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={permiso?.leer ?? false}
+                                    onChange={() => togglePermisoEnRol(rol.id, mod.id, 'leer')}
+                                  />
+                                  <span>👁️</span>
+                                </label>
+                                <label className="inline-flex items-center gap-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={permiso?.escribir ?? false}
+                                    onChange={() => togglePermisoEnRol(rol.id, mod.id, 'escribir')}
+                                  />
+                                  <span>✏️</span>
+                                </label>
+                              </div>
+                            );
+                          })}
                         </div>
                       </td>
                       <td className="px-3 py-2 space-x-2">
