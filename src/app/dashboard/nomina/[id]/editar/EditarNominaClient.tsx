@@ -423,6 +423,22 @@ export default function EditarNominaClient({
                       </div>
                       <div>
                         <label className="block text-xs font-medium mb-1">
+                          Auxilio Transporte
+                        </label>
+                        <input
+                          type="number"
+                          value={editForm.auxilio_transporte || 0}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              auxilio_transporte: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-2 py-1 border rounded text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">
                           Horas Extras
                         </label>
                         <input
@@ -439,15 +455,15 @@ export default function EditarNominaClient({
                       </div>
                       <div>
                         <label className="block text-xs font-medium mb-1">
-                          Bonificaciones
+                          Valor H. Extras
                         </label>
                         <input
                           type="number"
-                          value={editForm.bonificaciones || 0}
+                          value={editForm.valor_horas_extras || 0}
                           onChange={(e) =>
                             setEditForm({
                               ...editForm,
-                              bonificaciones: parseFloat(e.target.value) || 0,
+                              valor_horas_extras: parseFloat(e.target.value) || 0,
                             })
                           }
                           className="w-full px-2 py-1 border rounded text-sm"
@@ -455,29 +471,15 @@ export default function EditarNominaClient({
                       </div>
                       <div>
                         <label className="block text-xs font-medium mb-1">
-                          Otros Devengados
+                          Total Recargos
                         </label>
                         <input
                           type="number"
-                          value={editForm.otros_devengados || 0}
+                          value={editForm.total_recargos || 0}
                           onChange={(e) =>
                             setEditForm({
                               ...editForm,
-                              otros_devengados: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="w-full px-2 py-1 border rounded text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Salud</label>
-                        <input
-                          type="number"
-                          value={editForm.salud || 0}
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              salud: parseFloat(e.target.value) || 0,
+                              total_recargos: parseFloat(e.target.value) || 0,
                             })
                           }
                           className="w-full px-2 py-1 border rounded text-sm"
@@ -485,15 +487,31 @@ export default function EditarNominaClient({
                       </div>
                       <div>
                         <label className="block text-xs font-medium mb-1">
-                          Pensión
+                          Deducción Salud
                         </label>
                         <input
                           type="number"
-                          value={editForm.pension || 0}
+                          value={editForm.deduccion_salud || 0}
                           onChange={(e) =>
                             setEditForm({
                               ...editForm,
-                              pension: parseFloat(e.target.value) || 0,
+                              deduccion_salud: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-2 py-1 border rounded text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">
+                          Deducción Pensión
+                        </label>
+                        <input
+                          type="number"
+                          value={editForm.deduccion_pension || 0}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              deduccion_pension: parseFloat(e.target.value) || 0,
                             })
                           }
                           className="w-full px-2 py-1 border rounded text-sm"
@@ -505,43 +523,11 @@ export default function EditarNominaClient({
                         </label>
                         <input
                           type="number"
-                          value={editForm.fondo_solidaridad || 0}
+                          value={editForm.deduccion_fondo_solidario || 0}
                           onChange={(e) =>
                             setEditForm({
                               ...editForm,
-                              fondo_solidaridad: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="w-full px-2 py-1 border rounded text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">
-                          Retención Fuente
-                        </label>
-                        <input
-                          type="number"
-                          value={editForm.retencion_fuente || 0}
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              retencion_fuente: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="w-full px-2 py-1 border rounded text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">
-                          Otras Deducciones
-                        </label>
-                        <input
-                          type="number"
-                          value={editForm.otras_deducciones || 0}
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              otras_deducciones: parseFloat(e.target.value) || 0,
+                              deduccion_fondo_solidario: parseFloat(e.target.value) || 0,
                             })
                           }
                           className="w-full px-2 py-1 border rounded text-sm"
@@ -557,15 +543,21 @@ export default function EditarNominaClient({
                         </span>
                       </div>
                       <div>
-                        <span className="text-gray-500">H. Extras:</span>{" "}
+                        <span className="text-gray-500">Auxilio Transporte:</span>{" "}
                         <span className="font-medium">
-                          {formatCurrency(detalle.horas_extras)}
+                          {formatCurrency(detalle.auxilio_transporte)}
                         </span>
                       </div>
                       <div>
-                        <span className="text-gray-500">Bonificaciones:</span>{" "}
+                        <span className="text-gray-500">Valor H. Extras:</span>{" "}
                         <span className="font-medium">
-                          {formatCurrency(detalle.bonificaciones)}
+                          {formatCurrency(detalle.valor_horas_extras)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Recargos:</span>{" "}
+                        <span className="font-medium">
+                          {formatCurrency(detalle.total_recargos)}
                         </span>
                       </div>
                       <div>
@@ -577,13 +569,13 @@ export default function EditarNominaClient({
                       <div>
                         <span className="text-gray-500">Salud:</span>{" "}
                         <span className="font-medium">
-                          {formatCurrency(detalle.salud)}
+                          {formatCurrency(detalle.deduccion_salud)}
                         </span>
                       </div>
                       <div>
                         <span className="text-gray-500">Pensión:</span>{" "}
                         <span className="font-medium">
-                          {formatCurrency(detalle.pension)}
+                          {formatCurrency(detalle.deduccion_pension)}
                         </span>
                       </div>
                       <div>
