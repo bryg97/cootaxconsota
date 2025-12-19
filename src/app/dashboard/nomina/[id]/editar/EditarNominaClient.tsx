@@ -41,16 +41,14 @@ type Detalle = {
   usuario?: {
     id: string;
     nombre: string;
-    numero_documento: string;
-    cargo: string;
+    email: string;
   };
 };
 
 type EmpleadoActivo = {
   id: string;
   nombre: string;
-  numero_documento: string;
-  cargo: string;
+  email: string;
   salario_base: number;
 };
 
