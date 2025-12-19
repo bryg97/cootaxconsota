@@ -27,12 +27,22 @@ type Detalle = {
   horas_trabajadas: number;
   horas_extras: number;
   valor_horas_extras: number;
+  horas_extras_diurnas: number;
+  horas_extras_nocturnas: number;
+  horas_extras_diurnas_domingo: number;
+  horas_extras_nocturnas_domingo: number;
+  valor_extras_diurnas: number;
+  valor_extras_nocturnas: number;
+  valor_extras_diurnas_domingo: number;
+  valor_extras_nocturnas_domingo: number;
   horas_recargo_nocturno: number;
   valor_recargo_nocturno: number;
   horas_recargo_festivo: number;
   valor_recargo_festivo: number;
   horas_recargo_dominical: number;
   valor_recargo_dominical: number;
+  dias_adicionales_descanso: number;
+  valor_dias_adicionales: number;
   total_recargos: number;
   total_devengado: number;
   deduccion_salud: number;
@@ -44,8 +54,7 @@ type Detalle = {
   usuario?: {
     id: string;
     nombre: string;
-    numero_documento: string;
-    cargo: string;
+    email: string;
   };
 };
 
@@ -85,6 +94,7 @@ export default function NominaDetalleClient({
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [expandedUser, setExpandedUser] = useState<number | null>(null);
 
   const handleProcesar = async () => {
     if (!confirm("¿Está seguro de procesar esta nómina?")) return;
@@ -274,63 +284,153 @@ export default function NominaDetalleClient({
             No hay empleados registrados en esta nómina
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="px-3 py-2 text-left">Empleado</th>
-                  <th className="px-3 py-2 text-left">Documento</th>
-                  <th className="px-3 py-2 text-left">Cargo</th>
-                  <th className="px-3 py-2 text-right">Salario Base</th>
-                  <th className="px-3 py-2 text-right">H. Extras</th>
-                  <th className="px-3 py-2 text-right">Bonificaciones</th>
-                  <th className="px-3 py-2 text-right">Tot. Devengado</th>
-                  <th className="px-3 py-2 text-right">Salud</th>
-                  <th className="px-3 py-2 text-right">Pensión</th>
-                  <th className="px-3 py-2 text-right">Tot. Deducciones</th>
-                  <th className="px-3 py-2 text-right font-bold">Neto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detalles.map((detalle) => (
-                  <tr key={detalle.id} className="border-b hover:bg-gray-50">
-                    <td className="px-3 py-2 font-medium">
+          <div className="space-y-3">
+            {detalles.map((detalle) => (
+              <div key={detalle.id} className="border rounded-lg">
+                <div 
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
+                  onClick={() => setExpandedUser(expandedUser === detalle.id ? null : detalle.id)}
+                >
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-base">
                       {detalle.usuario?.nombre || "N/A"}
-                    </td>
-                    <td className="px-3 py-2">
-                      {detalle.usuario?.numero_documento || "N/A"}
-                    </td>
-                    <td className="px-3 py-2 text-xs">
-                      {detalle.usuario?.cargo || "N/A"}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {formatCurrency(detalle.salario_base)}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {formatCurrency(detalle.valor_horas_extras)}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {formatCurrency(detalle.total_recargos)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-medium text-green-600">
-                      {formatCurrency(detalle.total_devengado)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-red-600">
-                      {formatCurrency(detalle.deduccion_salud)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-red-600">
-                      {formatCurrency(detalle.deduccion_pension)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-medium text-red-600">
-                      {formatCurrency(detalle.total_deducciones)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-bold text-blue-600">
-                      {formatCurrency(detalle.neto_pagar)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </h3>
+                    <p className="text-sm text-gray-600">{detalle.usuario?.email}</p>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500">Devengado</div>
+                      <div className="font-semibold text-green-600">
+                        {formatCurrency(detalle.total_devengado)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500">Deducciones</div>
+                      <div className="font-semibold text-red-600">
+                        {formatCurrency(detalle.total_deducciones)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500">Neto</div>
+                      <div className="font-bold text-blue-600 text-lg">
+                        {formatCurrency(detalle.neto_pagar)}
+                      </div>
+                    </div>
+                    <button className="text-gray-400">
+                      {expandedUser === detalle.id ? "▼" : "▶"}
+                    </button>
+                  </div>
+                </div>
+
+                {expandedUser === detalle.id && (
+                  <div className="border-t bg-gray-50 p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div>
+                        <div className="text-xs text-gray-500">Salario Base</div>
+                        <div className="font-semibold">{formatCurrency(detalle.salario_base)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">Auxilio Transporte</div>
+                        <div className="font-semibold">{formatCurrency(detalle.auxilio_transporte)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">Horas Trabajadas</div>
+                        <div className="font-semibold">{detalle.horas_trabajadas || 0}h</div>
+                      </div>
+                      {detalle.dias_adicionales_descanso > 0 && (
+                        <div>
+                          <div className="text-xs text-gray-500">Días Adicionales</div>
+                          <div className="font-semibold">
+                            {detalle.dias_adicionales_descanso} = {formatCurrency(detalle.valor_dias_adicionales)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Horas Extras */}
+                    {detalle.horas_extras > 0 && (
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-sm mb-2">Horas Extras ({detalle.horas_extras.toFixed(2)}h = {formatCurrency(detalle.valor_horas_extras)})</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {detalle.horas_extras_diurnas > 0 && (
+                            <div className="bg-yellow-50 p-2 rounded">
+                              <div className="text-xs font-semibold">Extras Diurnas</div>
+                              <div className="text-sm">{detalle.horas_extras_diurnas.toFixed(2)}h = {formatCurrency(detalle.valor_extras_diurnas)}</div>
+                            </div>
+                          )}
+                          {detalle.horas_extras_nocturnas > 0 && (
+                            <div className="bg-indigo-50 p-2 rounded">
+                              <div className="text-xs font-semibold">Extras Nocturnas</div>
+                              <div className="text-sm">{detalle.horas_extras_nocturnas.toFixed(2)}h = {formatCurrency(detalle.valor_extras_nocturnas)}</div>
+                            </div>
+                          )}
+                          {detalle.horas_extras_diurnas_domingo > 0 && (
+                            <div className="bg-orange-50 p-2 rounded">
+                              <div className="text-xs font-semibold">Extras Dom. Diurnas</div>
+                              <div className="text-sm">{detalle.horas_extras_diurnas_domingo.toFixed(2)}h = {formatCurrency(detalle.valor_extras_diurnas_domingo)}</div>
+                            </div>
+                          )}
+                          {detalle.horas_extras_nocturnas_domingo > 0 && (
+                            <div className="bg-purple-50 p-2 rounded">
+                              <div className="text-xs font-semibold">Extras Dom. Nocturnas</div>
+                              <div className="text-sm">{detalle.horas_extras_nocturnas_domingo.toFixed(2)}h = {formatCurrency(detalle.valor_extras_nocturnas_domingo)}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recargos */}
+                    {detalle.total_recargos > 0 && (
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-sm mb-2">Recargos (Total: {formatCurrency(detalle.total_recargos)})</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {detalle.horas_recargo_nocturno > 0 && (
+                            <div className="bg-blue-50 p-2 rounded">
+                              <div className="text-xs font-semibold">Recargo Nocturno</div>
+                              <div className="text-sm">{detalle.horas_recargo_nocturno.toFixed(2)}h = {formatCurrency(detalle.valor_recargo_nocturno)}</div>
+                            </div>
+                          )}
+                          {detalle.horas_recargo_festivo > 0 && (
+                            <div className="bg-pink-50 p-2 rounded">
+                              <div className="text-xs font-semibold">Recargo Festivo</div>
+                              <div className="text-sm">{detalle.horas_recargo_festivo.toFixed(2)}h = {formatCurrency(detalle.valor_recargo_festivo)}</div>
+                            </div>
+                          )}
+                          {detalle.horas_recargo_dominical > 0 && (
+                            <div className="bg-green-50 p-2 rounded">
+                              <div className="text-xs font-semibold">Recargo Dominical</div>
+                              <div className="text-sm">{detalle.horas_recargo_dominical.toFixed(2)}h = {formatCurrency(detalle.valor_recargo_dominical)}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Deducciones */}
+                    <div>
+                      <h4 className="font-semibold text-sm mb-2">Deducciones (Total: {formatCurrency(detalle.total_deducciones)})</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="bg-red-50 p-2 rounded">
+                          <div className="text-xs font-semibold">Salud (4%)</div>
+                          <div className="text-sm">{formatCurrency(detalle.deduccion_salud)}</div>
+                        </div>
+                        <div className="bg-red-50 p-2 rounded">
+                          <div className="text-xs font-semibold">Pensión (4%)</div>
+                          <div className="text-sm">{formatCurrency(detalle.deduccion_pension)}</div>
+                        </div>
+                        {detalle.deduccion_fondo_solidario > 0 && (
+                          <div className="bg-red-50 p-2 rounded">
+                            <div className="text-xs font-semibold">Fondo Solidario</div>
+                            <div className="text-sm">{formatCurrency(detalle.deduccion_fondo_solidario)}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </section>
