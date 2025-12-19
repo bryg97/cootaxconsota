@@ -305,8 +305,7 @@ export default function EditarNominaClient({
                   <option value="">-- Seleccione --</option>
                   {empleadosDisponibles.map((emp) => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.nombre} - {emp.numero_documento} - {emp.cargo} (
-                      {formatCurrency(emp.salario_base)})
+                      {emp.nombre} - {emp.email} ({formatCurrency(emp.salario_base)})
                     </option>
                   ))}
                 </select>
