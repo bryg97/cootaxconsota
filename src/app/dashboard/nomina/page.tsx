@@ -17,7 +17,7 @@ export default async function NominaPage() {
 
   const { data: perfil } = await supabase
     .from("usuarios")
-    .select("id, nombre, estado, roles(nombre, permisos)")
+    .select("id, nombre, estado, roles(nombre, permisos, permisos_detallados)")
     .eq("id", user.id)
     .single();
 
@@ -29,9 +29,15 @@ export default async function NominaPage() {
 
   const roleName = (perfil as any)?.roles?.nombre ?? "operador";
   const isAdmin = roleName === "admin";
+  
+  // Verificar permisos detallados de nómina
+  const permisosDetallados = (perfil as any)?.roles?.permisos_detallados || [];
+  const permisoNomina = permisosDetallados.find((p: any) => p.modulo === "nomina");
+  const soloLectura = permisoNomina && permisoNomina.leer && !permisoNomina.escribir;
+  const esOperador = roleName === "operador";
 
-  // Cargar nóminas existentes
-  const { data: nominas, error } = await supabase
+  // Si es operador con solo lectura, solo mostrar sus propias liquidaciones
+  let nominasQuery = supabase
     .from("nominas")
     .select(`
       id,
@@ -46,8 +52,34 @@ export default async function NominaPage() {
       created_at,
       procesada_at,
       pagada_at
-    `)
-    .order("periodo", { ascending: false });
+    `);
+
+  // Si es operador con solo lectura, filtrar nóminas que contengan sus liquidaciones
+  let nominas;
+  let error;
+  
+  if (esOperador && soloLectura) {
+    // Obtener IDs de nóminas donde el usuario tiene liquidaciones
+    const { data: misDetalles } = await supabase
+      .from("nominas_detalle")
+      .select("nomina_id")
+      .eq("usuario_id", user.id);
+    
+    const nominaIds = (misDetalles || []).map(d => d.nomina_id);
+    
+    if (nominaIds.length > 0) {
+      const result = await nominasQuery.in("id", nominaIds).order("periodo", { ascending: false });
+      nominas = result.data;
+      error = result.error;
+    } else {
+      nominas = [];
+      error = null;
+    }
+  } else {
+    const result = await nominasQuery.order("periodo", { ascending: false });
+    nominas = result.data;
+    error = result.error;
+  }
 
   if (error) {
     return (
@@ -63,6 +95,7 @@ export default async function NominaPage() {
       sessionUserId={perfil.id}
       sessionUserName={(perfil as any).nombre ?? "Usuario"}
       isAdmin={isAdmin}
+      soloLectura={esOperador && soloLectura}
       initialNominas={nominas ?? []}
     />
   );

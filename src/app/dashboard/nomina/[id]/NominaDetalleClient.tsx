@@ -62,6 +62,8 @@ type Props = {
   nomina: Nomina;
   detalles: Detalle[];
   isAdmin: boolean;
+  soloLectura: boolean;
+  sessionUserId: string;
 };
 
 function formatCurrency(value: number) {
@@ -91,6 +93,8 @@ export default function NominaDetalleClient({
   nomina,
   detalles,
   isAdmin,
+  soloLectura,
+  sessionUserId,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -177,9 +181,14 @@ export default function NominaDetalleClient({
             ← Volver a nóminas
           </button>
           <h1 className="text-xl font-bold">Detalle de Nómina - {nomina.periodo}</h1>
+          {soloLectura && (
+            <div className="mt-2 bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded inline-block">
+              📋 Vista de solo lectura - Mostrando solo tu liquidación
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
-          {isAdmin && nomina.estado !== "pagada" && (
+          {!soloLectura && isAdmin && nomina.estado !== "pagada" && (
             <button
               onClick={() => router.push(`/dashboard/nomina/${nomina.id}/editar`)}
               className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-md"
@@ -188,7 +197,7 @@ export default function NominaDetalleClient({
               Editar
             </button>
           )}
-          {isAdmin && nomina.estado === "borrador" && (
+          {!soloLectura && isAdmin && nomina.estado === "borrador" && (
             <button
               onClick={handleProcesar}
               className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-md"
@@ -197,7 +206,7 @@ export default function NominaDetalleClient({
               Procesar
             </button>
           )}
-          {isAdmin && nomina.estado === "procesada" && (
+          {!soloLectura && isAdmin && nomina.estado === "procesada" && (
             <>
               <button
                 onClick={handlePagar}

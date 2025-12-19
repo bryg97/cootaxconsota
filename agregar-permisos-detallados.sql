@@ -13,9 +13,9 @@ SET permisos_detallados = (
       'escribir', true
     )
   )
-  FROM unnest(permisos) AS p
+  FROM jsonb_array_elements_text(permisos) AS p
 )
-WHERE permisos IS NOT NULL AND permisos_detallados = '[]'::jsonb;
+WHERE permisos IS NOT NULL AND permisos != 'null'::jsonb AND permisos_detallados = '[]'::jsonb;
 
 -- Verificar los cambios
 SELECT id, nombre, permisos, permisos_detallados FROM roles;

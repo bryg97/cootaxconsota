@@ -22,7 +22,7 @@ export default async function NominaDetallePage({
 
   const { data: perfil } = await supabase
     .from("usuarios")
-    .select("id, nombre, estado, roles(nombre, permisos)")
+    .select("id, nombre, estado, roles(nombre, permisos, permisos_detallados)")
     .eq("id", user.id)
     .single();
 
@@ -34,6 +34,12 @@ export default async function NominaDetallePage({
 
   const roleName = (perfil as any)?.roles?.nombre ?? "operador";
   const isAdmin = roleName === "admin";
+  
+  // Verificar permisos detallados
+  const permisosDetallados = (perfil as any)?.roles?.permisos_detallados || [];
+  const permisoNomina = permisosDetallados.find((p: any) => p.modulo === "nomina");
+  const soloLectura = permisoNomina && permisoNomina.leer && !permisoNomina.escribir;
+  const esOperador = roleName === "operador";
 
   // Obtener la nómina
   const { data: nomina, error: nominaError } = await supabase
@@ -47,7 +53,7 @@ export default async function NominaDetallePage({
   }
 
   // Obtener el detalle de empleados
-  const { data: detalles, error: detallesError } = await supabase
+  let detallesQuery = supabase
     .from("nominas_detalle")
     .select(`
       *,
@@ -57,8 +63,14 @@ export default async function NominaDetallePage({
         email
       )
     `)
-    .eq("nomina_id", id)
-    .order("usuario_id");
+    .eq("nomina_id", id);
+
+  // Si es operador con solo lectura, filtrar solo sus propios detalles
+  if (esOperador && soloLectura) {
+    detallesQuery = detallesQuery.eq("usuario_id", user.id);
+  }
+
+  const { data: detalles, error: detallesError } = await detallesQuery.order("usuario_id");
 
   console.log('Detalles query result:', { 
     detallesCount: detalles?.length, 
@@ -71,6 +83,8 @@ export default async function NominaDetallePage({
       nomina={nomina}
       detalles={detalles || []}
       isAdmin={isAdmin}
+      soloLectura={esOperador && soloLectura}
+      sessionUserId={user.id}
     />
   );
 }

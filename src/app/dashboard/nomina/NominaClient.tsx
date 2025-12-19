@@ -22,6 +22,7 @@ type Props = {
   sessionUserId: string;
   sessionUserName: string;
   isAdmin: boolean;
+  soloLectura: boolean;
   initialNominas: Nomina[];
 };
 
@@ -52,6 +53,7 @@ export default function NominaClient({
   sessionUserId,
   sessionUserName,
   isAdmin,
+  soloLectura,
   initialNominas,
 }: Props) {
   const router = useRouter();
@@ -93,19 +95,28 @@ export default function NominaClient({
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Nómina</h1>
         <div className="flex gap-2">
-          <button
-            onClick={() => router.push("/dashboard/nomina/turnos")}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-md"
-          >
-            📅 Consultar Turnos
-          </button>
-          {isAdmin && (
-            <button
-              onClick={() => router.push("/dashboard/nomina/nueva")}
-              className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-md"
-            >
-              + Nueva nómina
-            </button>
+          {!soloLectura && (
+            <>
+              <button
+                onClick={() => router.push("/dashboard/nomina/turnos")}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-md"
+              >
+                📅 Consultar Turnos
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => router.push("/dashboard/nomina/nueva")}
+                  className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-md"
+                >
+                  + Nueva nómina
+                </button>
+              )}
+            </>
+          )}
+          {soloLectura && (
+            <div className="bg-blue-100 text-blue-800 text-sm px-4 py-2 rounded-md font-medium">
+              📋 Vista de solo lectura - Mostrando solo tus liquidaciones
+            </div>
           )}
         </div>
       </div>
