@@ -533,6 +533,88 @@ export default function NuevaNominaClient({
     return result;
   }, [nominaCalculada, formulas, config]);
 
+  const guardarBorrador = async () => {
+    if (!periodo || !fechaInicio || !fechaFin) {
+      setMsg("❌ Completa todos los campos");
+      return;
+    }
+
+    setProcesando(true);
+    setMsg("");
+
+    try {
+      // 1. Crear la nómina como borrador
+      const { data: nominaData, error: nominaError } = await supabase
+        .from("nominas")
+        .insert({
+          periodo: tipo === "quincenal" ? `${periodo}-Q1` : periodo,
+          tipo,
+          fecha_inicio: fechaInicio,
+          fecha_fin: fechaFin,
+          estado: "borrador",
+          total_devengado: totales.devengado,
+          total_deducciones: totales.deducciones,
+          total_neto: totales.neto,
+        })
+        .select("id")
+        .single();
+
+      if (nominaError) throw new Error(nominaError.message);
+
+      const nominaId = nominaData.id;
+
+      // 2. Insertar detalles por empleado
+      const detalles = nominaCalculada.map((n) => ({
+        nomina_id: nominaId,
+        usuario_id: n.usuario_id,
+        salario_base: n.salario_base,
+        auxilio_transporte: n.auxilio_transporte,
+        horas_trabajadas: n.horas_trabajadas,
+        horas_extras: n.horas_extras,
+        horas_extras_diurnas: n.horas_extras_diurnas,
+        horas_extras_nocturnas: n.horas_extras_nocturnas,
+        horas_extras_diurnas_domingo: n.horas_extras_diurnas_domingo,
+        horas_extras_nocturnas_domingo: n.horas_extras_nocturnas_domingo,
+        valor_extras_diurnas: n.valor_extras_diurnas,
+        valor_extras_nocturnas: n.valor_extras_nocturnas,
+        valor_extras_diurnas_domingo: n.valor_extras_diurnas_domingo,
+        valor_extras_nocturnas_domingo: n.valor_extras_nocturnas_domingo,
+        horas_recargo_nocturno: n.horas_recargo_nocturno,
+        valor_recargo_nocturno: n.valor_recargo_nocturno,
+        horas_recargo_festivo: n.horas_recargo_festivo,
+        valor_recargo_festivo: n.valor_recargo_festivo,
+        horas_recargo_dominical: n.horas_recargo_dominical,
+        valor_recargo_dominical: n.valor_recargo_dominical,
+        dias_adicionales_descanso: n.dias_adicionales_descanso,
+        valor_dias_adicionales: n.valor_dias_adicionales,
+        total_recargos: n.total_recargos,
+        valor_horas_extras: n.valor_horas_extras,
+        total_devengado: n.total_devengado,
+        deduccion_salud: n.deduccion_salud,
+        deduccion_pension: n.deduccion_pension,
+        deduccion_fondo_solidario: n.deduccion_fondo_solidario,
+        total_deducciones: n.total_deducciones,
+        neto_pagar: n.neto_pagar,
+      }));
+
+      const { error: detalleError } = await supabase
+        .from("nominas_detalle")
+        .insert(detalles);
+
+      if (detalleError) throw new Error(detalleError.message);
+
+      setMsg("✅ Borrador guardado correctamente");
+      
+      setTimeout(() => {
+        router.push("/dashboard/nomina");
+      }, 2000);
+    } catch (e: any) {
+      setMsg(`❌ Error: ${e.message}`);
+    } finally {
+      setProcesando(false);
+    }
+  };
+
   const procesarNomina = async () => {
     if (!periodo || !fechaInicio || !fechaFin) {
       setMsg("❌ Completa todos los campos");
@@ -871,8 +953,15 @@ export default function NuevaNominaClient({
         </div>
       </section>
 
-      {/* Botón procesar */}
-      <div className="flex justify-end">
+      {/* Botones guardar/procesar */}
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={guardarBorrador}
+          disabled={procesando || cargandoTurnos}
+          className="bg-gray-600 hover:bg-gray-700 text-white text-sm font-semibold px-6 py-3 rounded-md disabled:opacity-50"
+        >
+          {procesando ? "Guardando..." : "Guardar Borrador"}
+        </button>
         <button
           onClick={procesarNomina}
           disabled={procesando || cargandoTurnos}

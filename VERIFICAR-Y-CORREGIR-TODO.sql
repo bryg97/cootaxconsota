@@ -19,11 +19,17 @@ FROM information_schema.tables
 WHERE table_schema = 'public' 
 AND table_name LIKE '%nomina%';
 
--- PASO 3: Ver datos reales
+-- PASO 3: Ver estructura de tabla usuarios
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'usuarios'
+ORDER BY ordinal_position;
+
+-- PASO 3b: Ver datos reales
 SELECT 
     nd.*,
     u.nombre,
-    u.numero_documento
+    u.email
 FROM nominas_detalle nd
 LEFT JOIN usuarios u ON nd.usuario_id = u.id
 LIMIT 5;
@@ -64,6 +70,10 @@ DROP POLICY IF EXISTS "select_nominas_policy" ON nominas;
 DROP POLICY IF EXISTS "insert_nominas_policy" ON nominas;
 DROP POLICY IF EXISTS "update_nominas_policy" ON nominas;
 DROP POLICY IF EXISTS "delete_nominas_policy" ON nominas;
+DROP POLICY IF EXISTS "nominas_select_policy" ON nominas;
+DROP POLICY IF EXISTS "nominas_insert_policy" ON nominas;
+DROP POLICY IF EXISTS "nominas_update_policy" ON nominas;
+DROP POLICY IF EXISTS "nominas_delete_policy" ON nominas;
 
 DROP POLICY IF EXISTS "Permitir todo a usuarios autenticados" ON nominas_detalle;
 DROP POLICY IF EXISTS "Permitir lectura de detalles" ON nominas_detalle;
@@ -74,6 +84,10 @@ DROP POLICY IF EXISTS "select_nomina_detalles_policy" ON nominas_detalle;
 DROP POLICY IF EXISTS "insert_nomina_detalles_policy" ON nominas_detalle;
 DROP POLICY IF EXISTS "update_nomina_detalles_policy" ON nominas_detalle;
 DROP POLICY IF EXISTS "delete_nomina_detalles_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "nominas_detalle_select_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "nominas_detalle_insert_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "nominas_detalle_update_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "nominas_detalle_delete_policy" ON nominas_detalle;
 
 -- Habilitar RLS
 ALTER TABLE nominas ENABLE ROW LEVEL SECURITY;

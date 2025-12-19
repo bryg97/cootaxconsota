@@ -64,7 +64,9 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("es-CO");
+  // Crear fecha local sin conversión de timezone
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("es-CO");
 }
 
 function getEstadoBadge(estado: string) {

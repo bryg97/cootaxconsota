@@ -9,12 +9,12 @@
 SELECT table_name 
 FROM information_schema.tables 
 WHERE table_schema = 'public' 
-AND table_name IN ('nominas', 'nomina_detalles', 'empleados');
+AND table_name IN ('nominas', 'nominas_detalle', 'usuarios');
 
--- Verificar columnas de nomina_detalles
+-- Verificar columnas de nominas_detalle
 SELECT column_name, data_type 
 FROM information_schema.columns 
-WHERE table_name = 'nomina_detalles'
+WHERE table_name = 'nominas_detalle'
 ORDER BY ordinal_position;
 
 -- =====================================================
@@ -22,24 +22,24 @@ ORDER BY ordinal_position;
 -- =====================================================
 
 -- Eliminar constraint existente y recrear con CASCADE
-ALTER TABLE nomina_detalles
-DROP CONSTRAINT IF EXISTS nomina_detalles_nomina_id_fkey CASCADE;
+ALTER TABLE nominas_detalle
+DROP CONSTRAINT IF EXISTS nominas_detalle_nomina_id_fkey CASCADE;
 
-ALTER TABLE nomina_detalles
-ADD CONSTRAINT nomina_detalles_nomina_id_fkey
+ALTER TABLE nominas_detalle
+ADD CONSTRAINT nominas_detalle_nomina_id_fkey
 FOREIGN KEY (nomina_id)
 REFERENCES nominas(id)
 ON DELETE CASCADE
 ON UPDATE CASCADE;
 
--- Hacer lo mismo para empleado_id si es UUID
-ALTER TABLE nomina_detalles
-DROP CONSTRAINT IF EXISTS nomina_detalles_empleado_id_fkey CASCADE;
+-- Hacer lo mismo para usuario_id si es UUID
+ALTER TABLE nominas_detalle
+DROP CONSTRAINT IF EXISTS nominas_detalle_usuario_id_fkey CASCADE;
 
-ALTER TABLE nomina_detalles
-ADD CONSTRAINT nomina_detalles_empleado_id_fkey
-FOREIGN KEY (empleado_id)
-REFERENCES empleados(id)
+ALTER TABLE nominas_detalle
+ADD CONSTRAINT nominas_detalle_usuario_id_fkey
+FOREIGN KEY (usuario_id)
+REFERENCES usuarios(id)
 ON DELETE RESTRICT
 ON UPDATE CASCADE;
 
@@ -55,12 +55,20 @@ DROP POLICY IF EXISTS "Permitir actualizar nominas" ON nominas;
 DROP POLICY IF EXISTS "Permitir eliminar nominas" ON nominas;
 DROP POLICY IF EXISTS "Permitir eliminar nominas para usuarios autenticados" ON nominas;
 
-DROP POLICY IF EXISTS "Permitir todo a usuarios autenticados" ON nomina_detalles;
-DROP POLICY IF EXISTS "Permitir lectura de detalles" ON nomina_detalles;
-DROP POLICY IF EXISTS "Permitir insertar detalles" ON nomina_detalles;
-DROP POLICY IF EXISTS "Permitir actualizar detalles" ON nomina_detalles;
-DROP POLICY IF EXISTS "Permitir eliminar detalles" ON nomina_detalles;
-DROP POLICY IF EXISTS "Permitir eliminar detalles de nomina para usuarios autenticados" ON nomina_detalles;
+DROP POLICY IF EXISTS "Permitir todo a usuarios autenticados" ON nominas_detalle;
+DROP POLICY IF EXISTS "Permitir lectura de detalles" ON nominas_detalle;
+DROP POLICY IF EXISTS "Permitir insertar detalles" ON nominas_detalle;
+DROP POLICY IF EXISTS "Permitir actualizar detalles" ON nominas_detalle;
+DROP POLICY IF EXISTS "Permitir eliminar detalles" ON nominas_detalle;
+DROP POLICY IF EXISTS "Permitir eliminar detalles de nomina para usuarios autenticados" ON nominas_detalle;
+DROP POLICY IF EXISTS "select_nomina_detalles_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "insert_nomina_detalles_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "update_nomina_detalles_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "delete_nomina_detalles_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "nominas_detalle_select_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "nominas_detalle_insert_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "nominas_detalle_update_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "nominas_detalle_delete_policy" ON nominas_detalle;
 
 -- =====================================================
 -- PARTE 4: Crear políticas nuevas para NOMINAS
@@ -121,22 +129,22 @@ USING (
 );
 
 -- =====================================================
--- PARTE 5: Crear políticas para NOMINA_DETALLES
+-- PARTE 5: Crear políticas para NOMINAS_DETALLE
 -- =====================================================
 
 -- Habilitar RLS
-ALTER TABLE nomina_detalles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nominas_detalle ENABLE ROW LEVEL SECURITY;
 
 -- Política para SELECT (todos los usuarios autenticados)
-CREATE POLICY "select_nomina_detalles_policy"
-ON nomina_detalles
+CREATE POLICY "nominas_detalle_select_policy"
+ON nominas_detalle
 FOR SELECT
 TO authenticated
 USING (true);
 
 -- Política para INSERT (solo admins)
-CREATE POLICY "insert_nomina_detalles_policy"
-ON nomina_detalles
+CREATE POLICY "nominas_detalle_insert_policy"
+ON nominas_detalle
 FOR INSERT
 TO authenticated
 WITH CHECK (
@@ -149,8 +157,8 @@ WITH CHECK (
 );
 
 -- Política para UPDATE (solo admins)
-CREATE POLICY "update_nomina_detalles_policy"
-ON nomina_detalles
+CREATE POLICY "nominas_detalle_update_policy"
+ON nominas_detalle
 FOR UPDATE
 TO authenticated
 USING (
@@ -164,8 +172,8 @@ USING (
 WITH CHECK (true);
 
 -- Política para DELETE (solo admins, nóminas no pagadas)
-CREATE POLICY "delete_nomina_detalles_policy"
-ON nomina_detalles
+CREATE POLICY "nominas_detalle_delete_policy"
+ON nominas_detalle
 FOR DELETE
 TO authenticated
 USING (
@@ -177,7 +185,7 @@ USING (
   )
   AND EXISTS (
     SELECT 1 FROM nominas n
-    WHERE n.id = nomina_detalles.nomina_id
+    WHERE n.id = nominas_detalle.nomina_id
     AND n.estado != 'pagada'
   )
 );
@@ -196,7 +204,7 @@ SELECT
   qual,
   with_check
 FROM pg_policies
-WHERE tablename IN ('nominas', 'nomina_detalles')
+WHERE tablename IN ('nominas', 'nominas_detalle')
 ORDER BY tablename, policyname;
 
 -- =====================================================
@@ -205,20 +213,21 @@ ORDER BY tablename, policyname;
 
 -- Ver nóminas
 SELECT id, periodo, tipo, estado, 
-       (SELECT COUNT(*) FROM nomina_detalles WHERE nomina_id = nominas.id) as num_detalles
+       (SELECT COUNT(*) FROM nominas_detalle WHERE nomina_id = nominas.id) as num_detalles
 FROM nominas
 ORDER BY id;
 
--- Ver detalles con empleados
+-- Ver detalles con usuarios
 SELECT 
   nd.id,
   nd.nomina_id,
-  nd.empleado_id,
-  e.nombre_completo,
+  nd.usuario_id,
+  u.nombre,
+  u.email,
   nd.salario_base,
   nd.total_devengado,
   nd.total_deducciones,
   nd.neto_pagar
-FROM nomina_detalles nd
-LEFT JOIN empleados e ON nd.empleado_id = e.id
+FROM nominas_detalle nd
+LEFT JOIN usuarios u ON nd.usuario_id = u.id
 ORDER BY nd.nomina_id, nd.id;
