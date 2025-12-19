@@ -54,12 +54,17 @@ export default async function NominaDetallePage({
       usuario:usuarios(
         id,
         nombre,
-        numero_documento,
-        cargo
+        email
       )
     `)
     .eq("nomina_id", id)
     .order("usuario_id");
+
+  console.log('Detalles query result:', { 
+    detallesCount: detalles?.length, 
+    error: detallesError,
+    nominaId: id 
+  });
 
   return (
     <NominaDetalleClient

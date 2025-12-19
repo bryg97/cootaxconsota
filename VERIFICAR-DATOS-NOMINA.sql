@@ -58,6 +58,8 @@ DROP POLICY IF EXISTS "nominas_detalle_select_policy" ON nominas_detalle;
 DROP POLICY IF EXISTS "nominas_detalle_insert_policy" ON nominas_detalle;
 DROP POLICY IF EXISTS "nominas_detalle_update_policy" ON nominas_detalle;
 DROP POLICY IF EXISTS "nominas_detalle_delete_policy" ON nominas_detalle;
+DROP POLICY IF EXISTS "allow_all_authenticated_nominas" ON nominas;
+DROP POLICY IF EXISTS "allow_all_authenticated_nominas_detalle" ON nominas_detalle;
 
 -- Ahora crear políticas simples
 CREATE POLICY "allow_all_authenticated_nominas"
