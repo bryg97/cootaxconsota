@@ -353,14 +353,15 @@ export default function CalendarioRotacionClient({
           </div>
 
           {/* Resumen del usuario */}
-          <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-3 gap-4">
+          <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-4 gap-3">
             <div className="text-center">
-              <div className="text-xs text-gray-500 font-medium">Turnos</div>
+              <div className="text-xs text-gray-500 font-medium">Turnos con horas</div>
               <div className="text-lg font-bold text-green-600">
                 {turnos.filter(t => 
                   t && t.usuario_id === usuario.id && 
-                  t.horarios && t.horarios.nombre && 
-                  !t.horarios.nombre.toLowerCase().includes("descanso")
+                  t.horarios && 
+                  !t.horarios.nombre?.toLowerCase().includes("descanso") &&
+                  (t.horarios.horas_trabajadas || 0) > 0
                 ).length}
               </div>
             </div>
@@ -379,6 +380,17 @@ export default function CalendarioRotacionClient({
                   t && t.usuario_id === usuario.id && 
                   t.horarios && t.horarios.nombre && 
                   t.horarios.nombre.toLowerCase().includes("descanso")
+                ).length}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-500 font-medium">Días libres (0h)</div>
+              <div className="text-lg font-bold text-yellow-600">
+                {turnos.filter(t => 
+                  t && t.usuario_id === usuario.id && 
+                  t.horarios && 
+                  !t.horarios.nombre?.toLowerCase().includes("descanso") &&
+                  (t.horarios.horas_trabajadas || 0) === 0
                 ).length}
               </div>
             </div>
