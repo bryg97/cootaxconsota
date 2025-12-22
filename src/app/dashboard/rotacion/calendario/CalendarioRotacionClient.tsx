@@ -274,8 +274,35 @@ export default function CalendarioRotacionClient({
                       {getNombreDiaCorto(diaSemana)}
                     </div>
 
-                    {/* Información del turno */}
-                    {turno && turno.horarios && !esTurnoDescanso && !esDiaLibre && (
+                    {/* Festivo - Prioridad máxima */}
+                    {esFestivo && (
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="text-[10px] font-bold text-purple-700 text-center leading-tight">
+                          {descripcionFestivo}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Descanso obligatorio - Solo si tiene turno y no es festivo */}
+                    {!esFestivo && esTurnoDescanso && turno && turno.horarios && (
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="text-xs font-bold text-red-600 text-center">
+                          {turno.horarios.nombre || 'Descanso'}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Día libre (0h pero no descanso) - Solo si no es festivo ni descanso */}
+                    {!esFestivo && !esTurnoDescanso && esDiaLibre && turno && turno.horarios && (
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="text-xs font-bold text-yellow-700 text-center leading-tight">
+                          {turno.horarios.nombre || 'Día libre'}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Turno normal con horas - Solo si no es festivo, ni descanso, ni día libre */}
+                    {!esFestivo && !esTurnoDescanso && !esDiaLibre && turno && turno.horarios && (
                       <div className="flex-1 flex flex-col justify-center">
                         <div className="text-xs font-bold text-green-800 leading-tight mb-1">
                           {turno.horarios.nombre || 'Sin nombre'}
@@ -284,34 +311,7 @@ export default function CalendarioRotacionClient({
                           {turno.horarios.hora_inicio ? turno.horarios.hora_inicio.slice(0, 5) : '--:--'} - {turno.horarios.hora_fin ? turno.horarios.hora_fin.slice(0, 5) : '--:--'}
                         </div>
                         <div className="text-[11px] text-green-600 font-bold mt-1">
-                          {turno.horarios.horas_trabajadas || 0}h
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Día libre */}
-                    {esDiaLibre && turno && turno.horarios && (
-                      <div className="flex-1 flex items-center justify-center">
-                        <div className="text-xs font-bold text-yellow-700 text-center">
-                          {turno.horarios.nombre || 'Día libre'}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Descanso */}
-                    {esTurnoDescanso && !esFestivo && (
-                      <div className="flex-1 flex items-center justify-center">
-                        <div className="text-xs font-bold text-red-600 text-center">
-                          Descanso
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Festivo */}
-                    {esFestivo && (
-                      <div className="flex-1 flex items-center justify-center">
-                        <div className="text-[10px] font-bold text-purple-700 text-center leading-tight">
-                          {descripcionFestivo}
+                          {turno.horarios.horas_trabajadas !== null && turno.horarios.horas_trabajadas !== undefined ? turno.horarios.horas_trabajadas : 0}h
                         </div>
                       </div>
                     )}
