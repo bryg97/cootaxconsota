@@ -285,10 +285,25 @@ export default function DashboardClient({ userName, turnos, festivos, tipoDescan
       </div>
 
       {/* Resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm text-gray-500">Turnos este mes</div>
-          <div className="text-3xl font-bold text-green-600">{turnos.length}</div>
+          <div className="text-sm text-gray-500">Turnos con horas</div>
+          <div className="text-3xl font-bold text-green-600">
+            {turnos.filter(t => 
+              t.horarios && 
+              !t.horarios.nombre.toLowerCase().includes("descanso") &&
+              t.horarios.horas_trabajadas > 0
+            ).length}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="text-sm text-gray-500">Días de descanso</div>
+          <div className="text-3xl font-bold text-red-600">
+            {turnos.filter(t => 
+              t.horarios && 
+              t.horarios.nombre.toLowerCase().includes("descanso")
+            ).length}
+          </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-sm text-gray-500">Festivos</div>
