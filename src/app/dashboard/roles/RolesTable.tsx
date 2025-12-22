@@ -59,9 +59,27 @@ export default function RolesTable({ initialRoles }: Props) {
     setRoles((prev) =>
       prev.map((r) => {
         if (r.id !== rolId) return r;
-        const permisosActualizados = (r.permisos_detallados || []).map(p =>
-          p.modulo === moduloId ? { ...p, [tipo]: !p[tipo] } : p
-        );
+        
+        // Asegurar que permisos_detallados existe
+        const permisosActuales = r.permisos_detallados || [];
+        
+        // Buscar si ya existe el permiso para este módulo
+        const existePermiso = permisosActuales.find(p => p.modulo === moduloId);
+        
+        let permisosActualizados;
+        if (existePermiso) {
+          // Actualizar el permiso existente
+          permisosActualizados = permisosActuales.map(p =>
+            p.modulo === moduloId ? { ...p, [tipo]: !p[tipo] } : p
+          );
+        } else {
+          // Crear el permiso si no existe
+          permisosActualizados = [
+            ...permisosActuales,
+            { modulo: moduloId, leer: tipo === 'leer', escribir: tipo === 'escribir' }
+          ];
+        }
+        
         return { ...r, permisos_detallados: permisosActualizados };
       })
     );
