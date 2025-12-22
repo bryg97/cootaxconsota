@@ -107,7 +107,7 @@ export default function CalendarioRotacionClient({
   const primerDiaSemana = primerDia.getDay();
 
   // Crear array de días
-  const dias = [];
+  const dias: number[] = [];
   for (let i = 1; i <= diasEnMes; i++) {
     dias.push(i);
   }
