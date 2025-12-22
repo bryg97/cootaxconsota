@@ -57,15 +57,25 @@ export default async function NominaPage() {
   // Si es operador con solo lectura, filtrar nóminas que contengan sus liquidaciones
   let nominas;
   let error;
+  let totalesPersonales = null;
   
   if (esOperador && soloLectura) {
     // Obtener IDs de nóminas donde el usuario tiene liquidaciones
     const { data: misDetalles } = await supabase
       .from("nominas_detalle")
-      .select("nomina_id")
+      .select("nomina_id, total_devengado, total_deducciones, neto_pagar")
       .eq("usuario_id", user.id);
     
     const nominaIds = (misDetalles || []).map(d => d.nomina_id);
+    
+    // Calcular totales personales
+    if (misDetalles && misDetalles.length > 0) {
+      totalesPersonales = {
+        totalDevengado: misDetalles.reduce((sum, d) => sum + (d.total_devengado || 0), 0),
+        totalDeducciones: misDetalles.reduce((sum, d) => sum + (d.total_deducciones || 0), 0),
+        totalNeto: misDetalles.reduce((sum, d) => sum + (d.neto_pagar || 0), 0),
+      };
+    }
     
     if (nominaIds.length > 0) {
       const result = await nominasQuery.in("id", nominaIds).order("periodo", { ascending: false });
@@ -97,6 +107,7 @@ export default async function NominaPage() {
       isAdmin={isAdmin}
       soloLectura={esOperador && soloLectura}
       initialNominas={nominas ?? []}
+      totalesPersonales={totalesPersonales}
     />
   );
 }

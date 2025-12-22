@@ -24,6 +24,11 @@ type Props = {
   isAdmin: boolean;
   soloLectura: boolean;
   initialNominas: Nomina[];
+  totalesPersonales?: {
+    totalDevengado: number;
+    totalDeducciones: number;
+    totalNeto: number;
+  } | null;
 };
 
 function formatCurrency(value: number) {
@@ -55,6 +60,7 @@ export default function NominaClient({
   isAdmin,
   soloLectura,
   initialNominas,
+  totalesPersonales,
 }: Props) {
   const router = useRouter();
   const [nominas, setNominas] = useState<Nomina[]>(initialNominas);
@@ -220,26 +226,38 @@ export default function NominaClient({
       {nominas.length > 0 && (
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500">Total Devengado (Todas)</div>
+            <div className="text-sm text-gray-500">
+              {soloLectura ? "Tu Total Devengado" : "Total Devengado (Todas)"}
+            </div>
             <div className="text-2xl font-bold text-green-600">
               {formatCurrency(
-                nominas.reduce((acc, n) => acc + (n.total_devengado || 0), 0)
+                soloLectura && totalesPersonales
+                  ? totalesPersonales.totalDevengado
+                  : nominas.reduce((acc, n) => acc + (n.total_devengado || 0), 0)
               )}
             </div>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500">Total Deducciones</div>
+            <div className="text-sm text-gray-500">
+              {soloLectura ? "Tus Total Deducciones" : "Total Deducciones"}
+            </div>
             <div className="text-2xl font-bold text-red-600">
               {formatCurrency(
-                nominas.reduce((acc, n) => acc + (n.total_deducciones || 0), 0)
+                soloLectura && totalesPersonales
+                  ? totalesPersonales.totalDeducciones
+                  : nominas.reduce((acc, n) => acc + (n.total_deducciones || 0), 0)
               )}
             </div>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500">Neto Total</div>
+            <div className="text-sm text-gray-500">
+              {soloLectura ? "Tu Neto Total" : "Neto Total"}
+            </div>
             <div className="text-2xl font-bold text-blue-600">
               {formatCurrency(
-                nominas.reduce((acc, n) => acc + (n.total_neto || 0), 0)
+                soloLectura && totalesPersonales
+                  ? totalesPersonales.totalNeto
+                  : nominas.reduce((acc, n) => acc + (n.total_neto || 0), 0)
               )}
             </div>
           </div>
