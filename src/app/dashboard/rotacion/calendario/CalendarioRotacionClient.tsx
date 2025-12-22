@@ -79,24 +79,38 @@ export default function CalendarioRotacionClient({
   // Crear mapa de turnos por fecha y usuario
   const turnosPorFechaUsuario = useMemo(() => {
     const mapa = new Map<string, Turno>();
-    turnos.forEach((t) => {
-      const key = `${t.fecha}-${t.usuario_id}`;
-      mapa.set(key, t);
-    });
+    if (turnos && Array.isArray(turnos)) {
+      turnos.forEach((t) => {
+        if (t && t.fecha && t.usuario_id && t.horarios) {
+          const key = `${t.fecha}-${t.usuario_id}`;
+          mapa.set(key, t);
+        }
+      });
+    }
     return mapa;
   }, [turnos]);
 
   // Crear set de festivos
   const festivosSet = useMemo(() => {
     const set = new Set<string>();
-    festivos.forEach((f) => set.add(f.fecha));
+    if (festivos && Array.isArray(festivos)) {
+      festivos.forEach((f) => {
+        if (f && f.fecha) set.add(f.fecha);
+      });
+    }
     return set;
   }, [festivos]);
 
   // Crear mapa de descripciones de festivos
   const festivosDesc = useMemo(() => {
     const mapa = new Map<string, string>();
-    festivos.forEach((f) => mapa.set(f.fecha, f.descripcion));
+    if (festivos && Array.isArray(festivos)) {
+      festivos.forEach((f) => {
+        if (f && f.fecha && f.descripcion) {
+          mapa.set(f.fecha, f.descripcion);
+        }
+      });
+    }
     return mapa;
   }, [festivos]);
 
@@ -195,9 +209,12 @@ export default function CalendarioRotacionClient({
               const turno = turnosPorFechaUsuario.get(key);
 
               const esTurnoDescanso = turno && 
+                turno.horarios &&
+                turno.horarios.nombre &&
                 turno.horarios.nombre.toLowerCase().includes("descanso");
 
               const esDiaLibre = turno && 
+                turno.horarios &&
                 turno.horarios.horas_trabajadas === 0 && 
                 !esTurnoDescanso;
 
@@ -256,25 +273,25 @@ export default function CalendarioRotacionClient({
                     </div>
 
                     {/* Información del turno */}
-                    {turno && !esTurnoDescanso && !esDiaLibre && (
+                    {turno && turno.horarios && !esTurnoDescanso && !esDiaLibre && (
                       <div className="flex-1 flex flex-col justify-center">
                         <div className="text-xs font-bold text-green-800 leading-tight mb-1">
-                          {turno.horarios.nombre}
+                          {turno.horarios.nombre || 'Sin nombre'}
                         </div>
                         <div className="text-[11px] text-green-700 font-medium">
-                          {turno.horarios.hora_inicio.slice(0, 5)} - {turno.horarios.hora_fin.slice(0, 5)}
+                          {turno.horarios.hora_inicio ? turno.horarios.hora_inicio.slice(0, 5) : '--:--'} - {turno.horarios.hora_fin ? turno.horarios.hora_fin.slice(0, 5) : '--:--'}
                         </div>
                         <div className="text-[11px] text-green-600 font-bold mt-1">
-                          {turno.horarios.horas_trabajadas}h
+                          {turno.horarios.horas_trabajadas || 0}h
                         </div>
                       </div>
                     )}
 
                     {/* Día libre */}
-                    {esDiaLibre && (
+                    {esDiaLibre && turno && turno.horarios && (
                       <div className="flex-1 flex items-center justify-center">
                         <div className="text-xs font-bold text-yellow-700 text-center">
-                          {turno.horarios.nombre}
+                          {turno.horarios.nombre || 'Día libre'}
                         </div>
                       </div>
                     )}
@@ -308,20 +325,20 @@ export default function CalendarioRotacionClient({
                   </div>
 
                   {/* Tooltip en hover */}
-                  {turno && (
+                  {turno && turno.horarios && (
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-xl">
                       <div className="font-bold">{nombreDia} {dia}</div>
-                      {esFestivo && (
+                      {esFestivo && descripcionFestivo && (
                         <div className="text-purple-300 font-semibold mt-1">{descripcionFestivo}</div>
                       )}
-                      {turno && (
+                      {turno.horarios && (
                         <>
-                          <div className="font-semibold mt-1">{turno.horarios.nombre}</div>
+                          <div className="font-semibold mt-1">{turno.horarios.nombre || 'Sin nombre'}</div>
                           <div className="text-gray-300">
-                            {turno.horarios.hora_inicio.slice(0, 5)} - {turno.horarios.hora_fin.slice(0, 5)}
+                            {turno.horarios.hora_inicio ? turno.horarios.hora_inicio.slice(0, 5) : '--:--'} - {turno.horarios.hora_fin ? turno.horarios.hora_fin.slice(0, 5) : '--:--'}
                           </div>
                           <div className="text-green-300 font-bold">
-                            {turno.horarios.horas_trabajadas} horas
+                            {turno.horarios.horas_trabajadas || 0} horas
                           </div>
                         </>
                       )}
@@ -338,21 +355,29 @@ export default function CalendarioRotacionClient({
             <div className="text-center">
               <div className="text-xs text-gray-500 font-medium">Turnos</div>
               <div className="text-lg font-bold text-green-600">
-                {turnos.filter(t => t.usuario_id === usuario.id && !t.horarios.nombre.toLowerCase().includes("descanso")).length}
+                {turnos.filter(t => 
+                  t && t.usuario_id === usuario.id && 
+                  t.horarios && t.horarios.nombre && 
+                  !t.horarios.nombre.toLowerCase().includes("descanso")
+                ).length}
               </div>
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-500 font-medium">Horas Total</div>
               <div className="text-lg font-bold text-blue-600">
                 {turnos
-                  .filter(t => t.usuario_id === usuario.id)
-                  .reduce((sum, t) => sum + (t.horarios.horas_trabajadas || 0), 0)}h
+                  .filter(t => t && t.usuario_id === usuario.id && t.horarios)
+                  .reduce((sum, t) => sum + (t.horarios?.horas_trabajadas || 0), 0)}h
               </div>
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-500 font-medium">Descansos</div>
               <div className="text-lg font-bold text-red-600">
-                {turnos.filter(t => t.usuario_id === usuario.id && t.horarios.nombre.toLowerCase().includes("descanso")).length}
+                {turnos.filter(t => 
+                  t && t.usuario_id === usuario.id && 
+                  t.horarios && t.horarios.nombre && 
+                  t.horarios.nombre.toLowerCase().includes("descanso")
+                ).length}
               </div>
             </div>
           </div>

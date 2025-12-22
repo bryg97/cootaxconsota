@@ -57,7 +57,7 @@ export default async function CalendarioRotacionPage() {
   // Obtener turnos de todos los usuarios del mismo rol para el mes actual
   let turnosData: any[] = [];
   if (usuariosIds.length > 0) {
-    const { data: turnos } = await supabase
+    const { data: turnos, error: turnosError } = await supabase
       .from("turnos")
       .select(`
         id,
@@ -72,7 +72,16 @@ export default async function CalendarioRotacionPage() {
       .lte("fecha", fechaFin)
       .order("fecha", { ascending: true });
 
-    turnosData = turnos || [];
+    if (!turnosError && turnos) {
+      // Filtrar turnos válidos con relaciones completas
+      turnosData = turnos.filter((t: any) => 
+        t && t.usuarios && t.horarios && 
+        t.horarios.nombre && 
+        t.horarios.hora_inicio && 
+        t.horarios.hora_fin &&
+        t.horarios.horas_trabajadas !== null
+      );
+    }
   }
 
   // Obtener festivos del mes
