@@ -208,11 +208,13 @@ export default function CalendarioRotacionClient({
               const key = `${fechaStr}-${usuario.id}`;
               const turno = turnosPorFechaUsuario.get(key);
 
+              // Identificar si es descanso obligatorio (prioridad: nombre con "descanso")
               const esTurnoDescanso = turno && 
                 turno.horarios &&
                 turno.horarios.nombre &&
                 turno.horarios.nombre.toLowerCase().includes("descanso");
 
+              // Días libres: turnos con 0h pero que NO son descanso obligatorio
               const esDiaLibre = turno && 
                 turno.horarios &&
                 turno.horarios.horas_trabajadas === 0 && 
@@ -226,27 +228,27 @@ export default function CalendarioRotacionClient({
                 borderColor = "border-blue-500 border-2";
               }
 
-              // Festivos en morado
+              // Prioridad 1: Festivos en morado
               if (esFestivo) {
                 bgColor = "bg-purple-100 hover:bg-purple-200";
                 textColor = "text-purple-900";
               }
-              // Descanso obligatorio en rojo
+              // Prioridad 2: Descanso obligatorio en rojo (aunque sea 0h)
               else if (esTurnoDescanso) {
-                bgColor = "bg-red-50 hover:bg-red-100";
-                textColor = "text-red-700";
+                bgColor = "bg-red-100 hover:bg-red-200";
+                textColor = "text-red-800";
               }
-              // Día libre en amarillo
+              // Prioridad 3: Día libre (0h pero no es descanso) en amarillo
               else if (esDiaLibre) {
-                bgColor = "bg-yellow-50 hover:bg-yellow-100";
-                textColor = "text-yellow-800";
+                bgColor = "bg-yellow-100 hover:bg-yellow-200";
+                textColor = "text-yellow-900";
               }
-              // Turno asignado en verde
-              else if (turno) {
+              // Prioridad 4: Turno asignado con horas en verde
+              else if (turno && turno.horarios && turno.horarios.horas_trabajadas > 0) {
                 bgColor = "bg-green-100 hover:bg-green-200";
                 textColor = "text-green-900";
               }
-              // Domingo sin turno
+              // Prioridad 5: Domingo sin turno en rojo claro
               else if (esDomingo) {
                 bgColor = "bg-red-50 hover:bg-red-100";
                 textColor = "text-red-600";
@@ -396,15 +398,15 @@ export default function CalendarioRotacionClient({
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-green-100 border border-green-300 rounded"></div>
-            <span className="text-gray-700 text-xs font-medium">Turno asignado</span>
+            <span className="text-gray-700 text-xs font-medium">Turno con horas</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-red-50 border border-red-200 rounded"></div>
-            <span className="text-gray-700 text-xs font-medium">Descanso</span>
+            <div className="w-6 h-6 bg-red-100 border border-red-300 rounded"></div>
+            <span className="text-gray-700 text-xs font-medium">Descanso obligatorio</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-yellow-50 border border-yellow-200 rounded"></div>
-            <span className="text-gray-700 text-xs font-medium">Día libre (0h)</span>
+            <div className="w-6 h-6 bg-yellow-100 border border-yellow-300 rounded"></div>
+            <span className="text-gray-700 text-xs font-medium">Día libre / Ausencia (0h)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-purple-100 border border-purple-300 rounded"></div>
