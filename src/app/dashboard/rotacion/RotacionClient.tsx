@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type Tramo = { inicio: string; fin: string };
@@ -133,6 +134,7 @@ export default function RotacionClient({
   initialPatrones,
   initialUsuarios,
 }: RotacionClientProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string>("");
 
@@ -351,7 +353,15 @@ export default function RotacionClient({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold">Rotación</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">Rotación</h1>
+        <button
+          onClick={() => router.push("/dashboard/rotacion/calendario")}
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+        >
+          📅 Ver Calendario del Equipo
+        </button>
+      </div>
 
       {msg && <div className="bg-white shadow rounded-lg p-3 text-sm">{msg}</div>}
 
